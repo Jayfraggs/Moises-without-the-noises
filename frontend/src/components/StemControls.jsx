@@ -4,13 +4,15 @@ const STEM_LABELS = {
   vocals: 'Vocals',
   drums: 'Drums',
   bass: 'Bass',
+  guitar: 'Guitar',
+  piano: 'Piano',
   other: 'Other',
 };
 
 // Drums never gets note detection attempted (see note_extraction.py) --
 // don't even render a tuner display slot for it, rather than showing a
 // permanent "n/a."
-const NOTE_CAPABLE_STEMS = new Set(['vocals', 'bass', 'other']);
+const NOTE_CAPABLE_STEMS = new Set(['vocals', 'bass', 'guitar', 'piano', 'other']);
 
 export function StemChannel({
   name,

@@ -23,6 +23,7 @@ import uuid
 import threading
 from pathlib import Path
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -127,6 +128,55 @@ def get_lyrics(song_id: str):
     return {"available": True, **json.loads(lyrics_path.read_text())}
 
 
+# Pydantic models for lyrics patching
+class LyricWord(BaseModel):
+    word: str
+    start: float
+    end: float
+
+
+class LyricsPatchBody(BaseModel):
+    words: list[LyricWord]
+
+
+@app.patch("/api/songs/{song_id}/lyrics")
+def patch_lyrics(song_id: str, body: LyricsPatchBody):
+    """
+    Atomically overwrite backend/data/{song_id}/lyrics.json with validated words.
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    # Validate each word: start >= 0, end > start
+    for i, w in enumerate(body.words):
+        if w.start < 0:
+            raise HTTPException(status_code=422, detail=f"word[{i}].start must be >= 0")
+        if w.end <= w.start:
+            raise HTTPException(status_code=422, detail=f"word[{i}].end must be > start")
+
+    lyrics_path = song_dir / "lyrics.json"
+    tmp_path = song_dir / "lyrics.json.tmp"
+
+    # Prepare payload
+    payload = {"words": [x.dict() for x in body.words]}
+
+    # Atomic write: write temp then replace
+    import os
+
+    tmp_path.write_text(json.dumps(payload))
+    os.replace(str(tmp_path), str(lyrics_path))
+
+    # Invalidate any manifest/cache if present (best-effort)
+    try:
+        if 'manifest_cache' in globals():
+            del globals()['manifest_cache']
+    except Exception:
+        pass
+
+    return payload
+
+
 # --- BPM & beats -------------------------------------------------------------
 
 @app.get("/api/songs/{song_id}/beats")
@@ -176,6 +226,18 @@ def get_key(song_id: str):
     result = detect_key(str(song_dir / f"{stem_name}.wav"))
     key_path.write_text(json.dumps(result))
     return result
+
+
+@app.get("/api/songs/{song_id}/chords")
+def get_chords(song_id: str) -> list[dict]:
+    """
+    Returns precomputed chord segments from `chords.json` produced by the Colab
+    notebook. Returns 404 if chords are not available for this song.
+    """
+    chords_path = DATA_DIR / song_id / "chords.json"
+    if not chords_path.exists():
+        raise HTTPException(status_code=404, detail="Chords not available for this song")
+    return json.loads(chords_path.read_text())
 
 
 # --- Export / pitch-shift ----------------------------------------------------

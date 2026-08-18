@@ -161,6 +161,8 @@ backend/data/my_song/
 
 **6-stem separation is Colab-only.** `htdemucs_6s` takes ~3-10x realtime on CPU. On a 16 GB RAM / no-GPU machine, that's 15–40 min for a 4-min song. Colab's T4 GPU does it in ~60 seconds.
 
+**Frame-length trade-off:** `frame_length=4096` is used for very low stems (bass/piano) to avoid pyin period-fitting warnings. This doubles the per-frame memory and compute for those stems; on Colab's free tier it's fine, but local imports on long tracks or memory-constrained machines (e.g., <16GB RAM) will be noticeably slower. This trade-off is preferred to incorrect pitch tracking; consider trimming long files or running on a machine with more RAM if you encounter slowdowns.
+
 **Lyrics require Colab.** Whisper on CPU is too slow to include in the local import path for v1.
 
 ---

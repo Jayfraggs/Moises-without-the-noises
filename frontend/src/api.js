@@ -37,6 +37,27 @@ export async function getNotes(songId, stemName) {
   return jsonOrThrow(res);
 }
 
+export async function getLyrics(songId) {
+  const res = await fetch(`${BASE}/songs/${songId}/lyrics`);
+  return jsonOrThrow(res);
+}
+
+export async function getBeats(songId) {
+  const res = await fetch(`${BASE}/songs/${songId}/beats`);
+  return jsonOrThrow(res);
+}
+
+export async function getKey(songId) {
+  const res = await fetch(`${BASE}/songs/${songId}/key`);
+  return jsonOrThrow(res);
+}
+
+export async function fetchChords(songId) {
+  const res = await fetch(`${BASE}/songs/${songId}/chords`);
+  if (res.status === 404) return null;
+  return jsonOrThrow(res);
+}
+
 export async function deleteSong(songId) {
   const res = await fetch(`${BASE}/songs/${songId}`, { method: 'DELETE' });
   return jsonOrThrow(res);
@@ -51,5 +72,14 @@ export async function importSong(file) {
 
 export async function getImportStatus(jobId) {
   const res = await fetch(`${BASE}/import/${jobId}/status`);
+  return jsonOrThrow(res);
+}
+
+export async function patchLyrics(songId, words) {
+  const res = await fetch(`${BASE}/songs/${songId}/lyrics`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ words }),
+  });
   return jsonOrThrow(res);
 }
