@@ -1,0 +1,18 @@
+# CPU-only torch — avoids the multi-GB CUDA wheel on a no-GPU machine.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Web framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+
+# ML / Audio
+torch==2.4.1
+demucs==4.0.1
+openai-whisper==20240930
+librosa==0.10.2
+soundfile==0.12.1
+numpy==1.26.4
+
+# Whisper dependency
+ffmpeg-python==0.2.0

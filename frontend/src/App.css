@@ -1,0 +1,502 @@
+/*
+  Design direction: this is a practice tool, not a marketing page, so the
+  reference point is real gear a bassist/drummer already reads fluently --
+  a mixing console's channel strips, and a hardware tuner's LED note
+  display -- rather than a generic dashboard.
+
+  Fonts are system stacks only (no @import, no CDN) because this app must
+  run fully offline after setup; a network-dependent font would silently
+  fall back and nobody would notice until they're on a plane.
+
+  Token system:
+    --bg          #14161A  base charcoal, not pure black (avoids OLED smear
+                            and reads as "gear," not "void")
+    --surface     #1D2026  panel background, one step up from bg
+    --surface-2   #23262D  channel strip body, one step up from surface
+    --text        #EDEAE3  warm off-white, not clinical pure white
+    --text-dim    #8A8D94  secondary labels
+    --amber       #E8A33D  signature accent -- VU meter / tuner LED color.
+                            Used for: the note display glow, solo state.
+                            Deliberately not the terracotta/vermilion or
+                            acid-green defaults -- amber ties specifically
+                            to analog gear indicator lights.
+    --teal        #4FB6A8  secondary accent -- oscilloscope-trace color.
+                            Used for: play button, positive/active states
+                            that aren't "this channel is soloed."
+    --red         #D65A4A  mute state only -- the one place red appears,
+                            so it stays meaningful as "cut."
+*/
+
+:root {
+  --bg: #14161a;
+  --surface: #1d2026;
+  --surface-2: #23262d;
+  --border: #2f333c;
+  --text: #edeae3;
+  --text-dim: #8a8d94;
+  --amber: #e8a33d;
+  --amber-glow: rgba(232, 163, 61, 0.55);
+  --teal: #4fb6a8;
+  --red: #d65a4a;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-data: ui-monospace, "SF Mono", "Cascadia Code", "Consolas", "Roboto Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app__header {
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app__title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.app__subtitle {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.app__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ---------- Sidebar ---------- */
+
+.app__sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.song-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.song-selector--empty p {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.song-selector__item {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.song-selector__item.is-selected {
+  background: var(--surface-2);
+}
+
+.song-selector__name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 9px 10px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  text-transform: capitalize;
+}
+
+.song-selector__name:hover {
+  background: var(--surface);
+}
+
+.song-selector__delete {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1rem;
+  padding: 8px 10px;
+  line-height: 1;
+}
+
+.song-selector__delete:hover {
+  color: var(--red);
+}
+
+.import-song {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.import-song__input {
+  display: none;
+}
+
+.import-song__label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.import-song__label:hover {
+  border-color: var(--teal);
+  color: var(--text);
+}
+
+.import-song__status {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.import-song__status-message {
+  color: var(--text);
+}
+
+.import-song__warning {
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.import-song__error {
+  margin-top: 10px;
+  color: var(--red);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* ---------- Main area ---------- */
+
+.app__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.app__empty-state,
+.app__loading {
+  margin: auto;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.app__error {
+  background: rgba(214, 90, 74, 0.12);
+  border: 1px solid var(--red);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+/* ---------- Mixing console ---------- */
+
+.mixing-console {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  align-items: stretch;
+}
+
+.channel-strip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 140px;
+  transition: border-color 0.15s;
+}
+
+.channel-strip.is-soloed {
+  border-color: var(--amber);
+}
+
+.channel-strip__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Signature element: recessed LED-style note display, echoing a hardware
+   tuner. Amber glow only appears when a note is actively sounding -- the
+   idle state is dim on purpose, so the glow reads as "live," not decorative. */
+.tuner-display {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 8px;
+  width: 100%;
+  text-align: center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.tuner-display__label {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.tuner-display__note {
+  font-family: var(--font-data);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #4a4d55;
+  min-height: 1.6rem;
+  line-height: 1.6rem;
+  transition: color 0.1s, text-shadow 0.1s;
+}
+
+.tuner-display__note.is-active {
+  color: var(--amber);
+  text-shadow: 0 0 12px var(--amber-glow);
+}
+
+.tuner-display__hint {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* Vertical fader. `orient="vertical"` on <input type=range> has no effect
+   in Chromium (Electron's renderer), so this is done with an explicit
+   rotation instead -- the input is authored horizontal at a fixed length,
+   then rotated -90deg inside a container sized for the rotated result. */
+.channel-strip__fader {
+  writing-mode: horizontal-tb;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  transform: rotate(-90deg);
+  margin: 46px 0;
+  flex-shrink: 0;
+}
+
+.channel-strip__fader::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--teal);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+
+.channel-strip__buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-mute,
+.btn-solo {
+  width: 34px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.btn-mute.is-active {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--bg);
+}
+
+.btn-solo.is-active {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--bg);
+}
+
+/* ---------- Transport ---------- */
+
+.transport {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transport__main-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-transport-play {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--teal);
+  background: transparent;
+  color: var(--teal);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-transport-play:hover {
+  background: rgba(79, 182, 168, 0.12);
+}
+
+.transport__time {
+  font-family: var(--font-data);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.transport__seek {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.transport__seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--teal);
+  cursor: pointer;
+}
+
+.transport__sub-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+.transport__speed-control,
+.transport__loop-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+}
+
+.transport__speed-control select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: var(--font-data);
+  font-size: 0.78rem;
+}
+
+.transport__speed-note {
+  font-size: 0.7rem;
+  color: var(--amber);
+}
+
+.transport__loop-control button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+}
+
+.transport__loop-control button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.transport__loop-range {
+  font-family: var(--font-data);
+  color: var(--amber);
+  font-size: 0.72rem;
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

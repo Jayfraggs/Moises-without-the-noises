@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Backend data — songs are local, not committed
+backend/data/*/
+!backend/data/.gitkeep
+backend/_import_tmp/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Electron
+electron/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Colab outputs (processed locally)
+_demucs_raw/
+output/
+*.zip
+
+# Env
+.env
