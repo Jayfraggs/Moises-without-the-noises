@@ -20,7 +20,7 @@ Separate vocals, drums, bass, guitar, and piano from any song. Loop sections, de
 | Key detection | ✅ | Krumhansl-Schmuckler |
 | Lyric transcription | ✅ Colab only | OpenAI Whisper |
 | Stem export (download WAV) | ✅ | FastAPI |
-| Pitch-preserving speed change | 🔜 v2 | `soundtouchjs` |
+| Real-time pitch changer (experimental) | ✅ Client + Server export | `soundtouch-audio-worklet` (client), `librosa` (server) |
 | Chord detection | 🔜 v2 | `chord-extractor` |
 | AI Voice Studio | ⚠️ Scoped out | Legal complexity |
 
@@ -164,6 +164,8 @@ backend/data/my_song/
 **Frame-length trade-off:** `frame_length=4096` is used for very low stems (bass/piano) to avoid pyin period-fitting warnings. This doubles the per-frame memory and compute for those stems; on Colab's free tier it's fine, but local imports on long tracks or memory-constrained machines (e.g., <16GB RAM) will be noticeably slower. This trade-off is preferred to incorrect pitch tracking; consider trimming long files or running on a machine with more RAM if you encounter slowdowns.
 
 **Lyrics require Colab.** Whisper on CPU is too slow to include in the local import path for v1.
+
+**Pitch + speed interaction:** When a non‑unity playback rate (`playbackRate !== 1`) and a non‑zero pitch shift (`semitones !== 0`) are both active, they interact in the current implementation. The client applies `playbackRate` on the `AudioBufferSourceNode` and also applies a SoundTouch-based AudioWorklet to change pitch — their effects combine and can produce unexpected results (the effective pitch heard is the result of both operations). Fully decoupling time‑stretch and pitch (so speed changes do not affect the pitch node's behavior) requires a more complex graph or a server‑side solution (e.g., Rubber Band Library) and is planned for a future release. Documenting this behavior helps users understand expected artifacts when using both controls together.
 
 ---
 

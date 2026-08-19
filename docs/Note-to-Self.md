@@ -20,15 +20,14 @@ Note detection complete.)
  
 - ✅
  
-- Audio Speed Changer: Make hard sections easy with 1-click slow down or speed up. Moises BPM detector finds, records & displays the BPM.
+- Audio Speed Changer: Make hard sections easy with 1-click slow down or speed up. Moises BPM detector finds, records & displays the BPM.✅
  
-- Pitch Changer & Finder: Easily control and change the audio key with our pitch finder. Shift the pitch to your vocal range or instrument tuner, great for practicing karaoke & singing.
  
-- AI Key Detection: Detect and change the song key and instantly transpose chords to all 12 keys.
+- AI Key Detection: Detect and change the song key and instantly transpose chords to all 12 keys. ✅
  
 - Collaborative Setlists: Invite collaborators, fine-tune song elements, and centralize all your musical work.
  
-- Count in: Set the "count in" period that precedes the playback so you and the band can start on the right beat.
+- Count in: Set the "count in" period that precedes the playback so you and the band can start on the right beat.✅
  
 - Backing Tracks: Make acapella, drums, bass, guitar, karaoke, and piano backing tracks.
  
@@ -39,3 +38,9 @@ Note detection complete.)
 - Export: Extract and share high-quality audio mixes and separated stems, including the metronome click-track. Extract audio stems for use in any track maker or with our voice remover.
 
 Populate the `.github\instructions\AGENTS-instructions.md`
+
+add a feature that estimates the time to completion of load for full run
+
+Also give the options to selectwhether or not the users want to decode the lyrics, what stems to seperate and which not, etc
+
+Start writing tests to see if the software is on track

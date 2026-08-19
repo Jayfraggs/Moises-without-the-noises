@@ -83,3 +83,49 @@ export async function patchLyrics(songId, words) {
   });
   return jsonOrThrow(res);
 }
+
+// Export a stem at a given pitch (server-side export endpoint)
+export async function exportStemAtPitch(songId, stemName, semitones) {
+  const qs = new URLSearchParams({ semitones: String(semitones) });
+  const res = await fetch(`${BASE}/songs/${songId}/stems/${stemName}/export?${qs.toString()}`);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {}
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  const blob = await res.blob();
+  return blob;
+}
+
+export function triggerBrowserDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function exportMix(songId, stemGains, includeClick) {
+  const res = await fetch(`${BASE}/songs/${songId}/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stem_gains: stemGains, include_click: includeClick }),
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {}
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  const blob = await res.blob();
+  return blob;
+}
