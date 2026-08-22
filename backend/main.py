@@ -23,6 +23,7 @@ import uuid
 import threading
 from pathlib import Path
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -127,6 +128,55 @@ def get_lyrics(song_id: str):
     return {"available": True, **json.loads(lyrics_path.read_text())}
 
 
+# Pydantic models for lyrics patching
+class LyricWord(BaseModel):
+    word: str
+    start: float
+    end: float
+
+
+class LyricsPatchBody(BaseModel):
+    words: list[LyricWord]
+
+
+@app.patch("/api/songs/{song_id}/lyrics")
+def patch_lyrics(song_id: str, body: LyricsPatchBody):
+    """
+    Atomically overwrite backend/data/{song_id}/lyrics.json with validated words.
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    # Validate each word: start >= 0, end > start
+    for i, w in enumerate(body.words):
+        if w.start < 0:
+            raise HTTPException(status_code=422, detail=f"word[{i}].start must be >= 0")
+        if w.end <= w.start:
+            raise HTTPException(status_code=422, detail=f"word[{i}].end must be > start")
+
+    lyrics_path = song_dir / "lyrics.json"
+    tmp_path = song_dir / "lyrics.json.tmp"
+
+    # Prepare payload
+    payload = {"words": [x.dict() for x in body.words]}
+
+    # Atomic write: write temp then replace
+    import os
+
+    tmp_path.write_text(json.dumps(payload))
+    os.replace(str(tmp_path), str(lyrics_path))
+
+    # Invalidate any manifest/cache if present (best-effort)
+    try:
+        if 'manifest_cache' in globals():
+            del globals()['manifest_cache']
+    except Exception:
+        pass
+
+    return payload
+
+
 # --- BPM & beats -------------------------------------------------------------
 
 @app.get("/api/songs/{song_id}/beats")
@@ -178,6 +228,18 @@ def get_key(song_id: str):
     return result
 
 
+@app.get("/api/songs/{song_id}/chords")
+def get_chords(song_id: str) -> list[dict]:
+    """
+    Returns precomputed chord segments from `chords.json` produced by the Colab
+    notebook. Returns 404 if chords are not available for this song.
+    """
+    chords_path = DATA_DIR / song_id / "chords.json"
+    if not chords_path.exists():
+        raise HTTPException(status_code=404, detail="Chords not available for this song")
+    return json.loads(chords_path.read_text())
+
+
 # --- Export / pitch-shift ----------------------------------------------------
 
 @app.get("/api/songs/{song_id}/stems/{stem_name}/export")
@@ -185,12 +247,12 @@ def export_stem(
     song_id: str,
     stem_name: str,
     semitones: float = Query(default=0.0, ge=-12.0, le=12.0),
-    speed: float = Query(default=1.0, ge=0.5, le=2.0),
 ):
     """
-    Downloads a stem WAV with optional pitch shift and/or time stretch.
-    Server-side via librosa phase vocoder. For playback-time changes,
-    see AudioEngine.js.
+    Downloads a stem WAV with optional pitch shift applied server-side.
+
+    This endpoint returns a one-shot export (no caching) as a streaming
+    WAV. If `semitones == 0.0` the original file bytes are returned.
 
     DATA WARNING: stems are 30-100MB. Don't hit this on mobile data.
     """
@@ -198,30 +260,94 @@ def export_stem(
     if not stem_path.exists():
         raise HTTPException(404, f"No stem '{stem_name}' for song '{song_id}'")
 
-    audio_path = str(stem_path)
+    # Local import to avoid top-level import cycles and keep this change
+    # limited to the export route. Returns raw WAV bytes.
+    from audio.pitch_shift import shift_pitch
+    from fastapi.responses import StreamingResponse
+    import io
 
-    if semitones != 0.0 and speed != 1.0:
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp.write(pitch_shift_wav(audio_path, semitones))
-            tmp_path = tmp.name
-        try:
-            wav_bytes = time_stretch_wav(tmp_path, speed)
-        finally:
-            os.unlink(tmp_path)
-    elif semitones != 0.0:
-        wav_bytes = pitch_shift_wav(audio_path, semitones)
-    elif speed != 1.0:
-        wav_bytes = time_stretch_wav(audio_path, speed)
+    if semitones != 0.0:
+        wav_bytes = shift_pitch(stem_path, semitones)
     else:
         wav_bytes = stem_path.read_bytes()
 
     tag = f"_{'+' if semitones > 0 else ''}{semitones}st" if semitones != 0.0 else ""
-    tag += f"_{speed}x" if speed != 1.0 else ""
     filename = f"{song_id}_{stem_name}{tag}.wav"
 
-    return Response(
-        content=wav_bytes,
+    return StreamingResponse(
+        io.BytesIO(wav_bytes),
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# Export mix of stems with optional click overlay
+class ExportMixBody(BaseModel):
+    stem_gains: dict[str, float] = {}
+    include_click: bool = False
+
+
+@app.post("/api/songs/{song_id}/export")
+def export_mix(song_id: str, body: ExportMixBody):
+    """Return a mixed stereo WAV per-stem gains and optional click overlay.
+
+    Request JSON: { "stem_gains": {"vocals":1.0}, "include_click": false }
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    beats = []
+    bpm = 120.0
+    if body.include_click:
+        beats_path = song_dir / "beats.json"
+        if not beats_path.exists():
+            raise HTTPException(status_code=422, detail="beats not available for this song")
+        beats_payload = json.loads(beats_path.read_text())
+        beats = beats_payload.get("beats", [])
+        bpm = beats_payload.get("bpm", bpm)
+
+    # Perform the mix
+    from audio.mixer import mix_stems
+    mix = mix_stems(song_dir, body.stem_gains or {}, body.include_click, beats, bpm)
+
+    # Determine sample rate from first existing stem (fallback to 44100)
+    import soundfile as _sf
+    sr = None
+    manifest_path = song_dir / "manifest.json"
+    stems = []
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text())
+            stems = manifest.get("stems", [])
+        except Exception:
+            stems = []
+    if not stems:
+        stems = [p.stem for p in sorted(song_dir.glob("*.wav"))]
+    for s in stems:
+        p = song_dir / f"{s}.wav"
+        if p.exists():
+            try:
+                sr = _sf.info(str(p)).samplerate
+                break
+            except Exception:
+                continue
+    if sr is None:
+        sr = 44100
+
+    # Encode to WAV in-memory
+    import io
+    buf = io.BytesIO()
+    with _sf.SoundFile(buf, mode="w", samplerate=sr, channels=2, format="WAV", subtype="PCM_16") as f:
+        if mix.size:
+            f.write(mix)
+
+    buf.seek(0)
+    filename = f"{song_id}_mix.wav"
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
         media_type="audio/wav",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import copy from 'rollup-plugin-copy';
 
 // Dev server proxies /api to the FastAPI backend so `npm run dev` works
 // against a locally running `uvicorn main:app --reload` without CORS
@@ -15,5 +16,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      plugins: [
+        copy({
+          targets: [
+            { src: 'node_modules/soundtouch-audio-worklet/dist/*', dest: 'public/libs/soundtouch' },
+          ],
+          hook: 'buildStart',
+        }),
+      ],
+    },
   },
 });

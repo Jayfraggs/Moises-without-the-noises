@@ -9,7 +9,17 @@ function formatTime(seconds) {
 
 const SPEED_STEPS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 
-export function TransportControls({ engine, isPlaying, onPlayPause, duration }) {
+export function TransportControls({
+  engine,
+  isPlaying,
+  onPlayPause,
+  duration,
+  metronomeEnabled,
+  metronomeVolume,
+  metronomeAvailable,
+  onToggleMetronome,
+  onMetronomeVolumeChange,
+}) {
   const [position, setPosition] = useState(0);
   const [speed, setSpeed] = useState(1.0);
   const [loopStart, setLoopStart] = useState(null);
@@ -106,6 +116,34 @@ export function TransportControls({ engine, isPlaying, onPlayPause, duration }) 
             <span className="transport__loop-range">
               {formatTime(loopStart)} \u2192 {formatTime(loopEnd)}
             </span>
+          )}
+        </div>
+
+        <div className="transport__metronome-control">
+          <button
+            type="button"
+            className={`btn-toggle ${metronomeEnabled ? 'is-active' : ''}`}
+            onClick={onToggleMetronome}
+            disabled={!metronomeAvailable}
+            title={metronomeAvailable ? 'Metronome' : 'Beat data unavailable'}
+            aria-pressed={metronomeEnabled}
+          >
+            Metronome
+          </button>
+
+          {metronomeEnabled && metronomeAvailable && (
+            <label className="transport__metronome-volume">
+              <span>Volume</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={metronomeVolume}
+                onChange={(e) => onMetronomeVolumeChange(parseFloat(e.target.value))}
+                aria-label="Metronome volume"
+              />
+            </label>
           )}
         </div>
       </div>
