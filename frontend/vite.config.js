@@ -17,14 +17,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      plugins: [
-        copy({
-          targets: [
-            { src: 'node_modules/soundtouch-audio-worklet/dist/*', dest: 'public/libs/soundtouch' },
-          ],
-          hook: 'buildStart',
-        }),
-      ],
+      external: ['soundtouch-audio-worklet'],
     },
   },
 });

@@ -81,17 +81,30 @@ Push-Location electron
 npm install
 Pop-Location
 
-# --- 4. Demucs model download ---
+# --- 4. Demucs model download (LOCAL PATH ONLY) ---
+#
+# This step is only needed if you are running Demucs locally (POST /api/import).
+# If you are using the Google Colab path, demucs is not installed locally and
+# this step is intentionally skipped.
 
 Write-Host ""
-Write-Host "Downloading Demucs model (htdemucs, ~80MB)..." -ForegroundColor Cyan
-Write-Host "This is the step that specifically requires internet access."
-python -c "from demucs.pretrained import get_model; get_model('htdemucs'); print('Model cached successfully.')"
+python -c "import demucs" 2>&1 | Out-Null
+$demucsInstalled = ($LASTEXITCODE -eq 0)
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: model download failed. Check your internet connection and re-run activate.ps1." -ForegroundColor Red
-    exit 1
+if ($demucsInstalled) {
+    Write-Host "Downloading Demucs model (htdemucs, ~80MB)..." -ForegroundColor Cyan
+    Write-Host "This is the step that specifically requires internet access."
+    python -c "from demucs.pretrained import get_model; get_model('htdemucs'); print('Model cached successfully.')"
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: model download failed. Check your internet connection and re-run activate.ps1." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "Skipping Demucs model download - demucs is not installed (Colab path selected)." -ForegroundColor Yellow
+    Write-Host "To cache model weights locally, uncomment demucs in backend\requirements.txt and re-run this script."
 }
+
 
 # --- 5. Done ---
 

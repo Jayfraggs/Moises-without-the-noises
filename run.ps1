@@ -25,7 +25,7 @@ if (-not (Test-Path ".\frontend\dist\index.html")) {
 Write-Host "Starting backend..." -ForegroundColor Cyan
 
 $backendProcess = Start-Process powershell `
-    -ArgumentList "-NoExit", "-Command", "& '.\venv\Scripts\Activate.ps1'; cd backend; uvicorn main:app --host 127.0.0.1 --port 8000" `
+    -ArgumentList "-NoExit", "-Command", "& '.\.venv\Scripts\Activate.ps1'; cd backend; uvicorn main:app --host 127.0.0.1 --port 8000" `
     -PassThru
 
 # Poll the backend instead of a fixed sleep -- startup time varies a lot
@@ -60,7 +60,7 @@ if (-not $backendUp) {
 Write-Host "Starting Electron shell..." -ForegroundColor Cyan
 Push-Location electron
 try {
-    npm start
+    cmd /c npm start
 } finally {
     Pop-Location
     Write-Host "Electron closed. Stopping backend..." -ForegroundColor Cyan

@@ -1,18 +1,24 @@
-# CPU-only torch — avoids the multi-GB CUDA wheel on a no-GPU machine.
---extra-index-url https://download.pytorch.org/whl/cpu
+# CPU-only torch — only needed for LOCAL separation (POST /api/import).
+# Colab users: these are not installed on your machine. Comment them back
+# in and re-run activate.ps1 only if you want to run Demucs locally.
+# --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Web framework
+# Web framework — always required
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.12
 
-# ML / Audio
-torch==2.4.1
-demucs==4.0.1
-openai-whisper==20240930
+# Local ML / Audio — comment these in if using the local separation path.
+# NOTE: torch pin requires Python <=3.12. On Python 3.13+ use torch>=2.9.0.
+# torch==2.4.1
+# demucs==4.0.1
+# openai-whisper==20240930
+
+# Audio analysis — used at runtime by bpm.py and key_detection.py regardless of path.
+# librosa and soundfile are safe to install; they have no GPU/model dependency.
 librosa==0.10.2
 soundfile==0.12.1
-numpy==1.26.4
+numpy>=2.0
 
-# Whisper dependency
-ffmpeg-python==0.2.0
+# ffmpeg-python — only needed by Whisper for audio decoding. Comment in with Whisper.
+# ffmpeg-python==0.2.0
