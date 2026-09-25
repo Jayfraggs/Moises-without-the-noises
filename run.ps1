@@ -8,6 +8,13 @@
     Electron shell in the foreground. When you close the Electron window,
     this script stops the backend process too -- otherwise uvicorn would
     keep running invisibly and the next run.ps1 would fail to bind the port.
+
+    Auto-rebuild: before launching, this script compares the newest
+    file under frontend/src/ (and vite.config.js / package.json) against
+    frontend/dist/index.html. If anything is newer the frontend is
+    rebuilt automatically -- no manual `npm run build` needed.
+    Uses `cmd /c npm run build` to sidestep PowerShell execution-policy
+    restrictions on npm.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -17,15 +24,61 @@ if (-not (Test-Path ".\venv\Scripts\Activate.ps1")) {
     exit 1
 }
 
-if (-not (Test-Path ".\frontend\dist\index.html")) {
-    Write-Host "ERROR: frontend isn't built. Run .\activate.ps1 first." -ForegroundColor Red
+# --- Frontend staleness check + auto-rebuild ------------------------------------
+#
+# Compare the newest mtime across frontend/src/**/* plus vite.config.js and
+# package.json against frontend/dist/index.html. Rebuild whenever src is newer
+# or dist doesn't exist yet.
+
+$distIndex = ".\frontend\dist\index.html"
+
+if (-not (Test-Path $distIndex)) {
+    Write-Host "No dist found -- building frontend for the first time..." -ForegroundColor Cyan
+    Push-Location frontend
+    cmd /c npm run build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: frontend build failed. Check the output above." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+    Pop-Location
+} else {
+    $distTime = (Get-Item $distIndex).LastWriteTimeUtc
+
+    # Gather all source files that should trigger a rebuild when changed
+    $srcFiles = @(
+        Get-ChildItem -Path ".\frontend\src" -Recurse -File
+        Get-Item ".\frontend\vite.config.js" -ErrorAction SilentlyContinue
+        Get-Item ".\frontend\package.json"   -ErrorAction SilentlyContinue
+    ) | Where-Object { $_ -ne $null }
+
+    $newestSrc = ($srcFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
+
+    if ($newestSrc -gt $distTime) {
+        Write-Host "Source files changed since last build -- rebuilding frontend..." -ForegroundColor Cyan
+        Push-Location frontend
+        cmd /c npm run build
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: frontend build failed. Check the output above." -ForegroundColor Red
+            Pop-Location
+            exit 1
+        }
+        Pop-Location
+        Write-Host "Frontend rebuilt successfully." -ForegroundColor Green
+    } else {
+        Write-Host "Frontend is up to date (no rebuild needed)." -ForegroundColor Green
+    }
+}
+
+if (-not (Test-Path $distIndex)) {
+    Write-Host "ERROR: dist/index.html still missing after build attempt." -ForegroundColor Red
     exit 1
 }
 
 Write-Host "Starting backend..." -ForegroundColor Cyan
 
 $backendProcess = Start-Process powershell `
-    -ArgumentList "-NoExit", "-Command", "& '.\.venv\Scripts\Activate.ps1'; cd backend; uvicorn main:app --host 127.0.0.1 --port 8000" `
+    -ArgumentList "-NoExit", "-Command", "& '.\venv\Scripts\Activate.ps1'; cd backend; uvicorn main:app --host 127.0.0.1 --port 8000" `
     -PassThru
 
 # Poll the backend instead of a fixed sleep -- startup time varies a lot

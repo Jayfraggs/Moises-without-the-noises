@@ -11,6 +11,8 @@
       2. Installs frontend npm deps and builds the React app to
          frontend/dist/ (the backend serves this directly -- no separate
          frontend server needed at runtime).
+         Note: run.ps1 auto-rebuilds whenever src/ is newer than dist/,
+         so you only need to manually build here on the very first run.
       3. Installs Electron's npm deps.
       4. Downloads the Demucs "htdemucs" model weights. This is the part
          that specifically needs internet -- Demucs pulls pretrained
@@ -65,7 +67,10 @@ if (-not $npmCmd) {
 Write-Host "Installing frontend dependencies..." -ForegroundColor Cyan
 Push-Location frontend
 npm install
-Write-Host "Building frontend for production..."
+# Build once now. After this, run.ps1 auto-rebuilds whenever frontend/src/**
+# is newer than dist/index.html -- so you won't need to re-run this step
+# unless you reinstall node_modules.
+Write-Host "Building frontend for production (first-time build)..."
 npm run build
 Pop-Location
 

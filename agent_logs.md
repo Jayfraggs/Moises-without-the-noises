@@ -57,3 +57,16 @@
 - `OnboardingWizard.jsx` retained in the repo (not deleted) — the import in `App.jsx` now points to `SetupWizard`.
 - `useOnboarding` hook and `localStorage` persistence unchanged.
 - Build verified: `npm run build` produces zero errors or warnings (50 modules, 190 KB JS, 20 KB CSS).
+
+## 2026-09-25
+
+### Auto-rebuild on launch — stale dist fix (DX-001)
+- Root cause: Electron loads `http://localhost:8000` which serves `frontend/dist/` (a compiled static bundle). Any `src/` changes made after the last `npm run build` were invisible at runtime.
+- Fix (run.ps1): replaced the hard `dist/index.html` existence guard with a mtime-based staleness check.
+  - Collects all files under `frontend/src/**`, `vite.config.js`, and `package.json`.
+  - Compares the newest mtime against `frontend/dist/index.html`.
+  - If `src` is newer → runs `cmd /c npm run build` in the `frontend/` directory (uses `cmd` to bypass PowerShell's execution-policy restrictions on npm) and aborts on failure.
+  - If already up to date → skips build and prints "Frontend is up to date (no rebuild needed)."
+  - If `dist` doesn't exist at all → builds unconditionally (first-run path).
+- Fix (activate.ps1): added comments clarifying that the build in step 2 is a one-time first-run step; subsequent incremental rebuilds are handled automatically by `run.ps1`.
+- Files modified: `run.ps1`, `activate.ps1`.

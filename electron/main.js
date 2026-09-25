@@ -10,7 +10,9 @@
  * Deliberately not building that yet per the "thin shell first" decision.
  */
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const path = require('path');
+const { detectDrivePath, getDriveConfig, setDriveConfig } = require('./driveDetect');
 
 const BACKEND_URL = 'http://localhost:8000';
 const MAX_RETRIES = 15;
@@ -25,6 +27,7 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
@@ -54,6 +57,19 @@ function loadWithRetry(win, retriesLeft) {
     setTimeout(() => loadWithRetry(win, retriesLeft - 1), RETRY_DELAY_MS);
   });
 }
+
+ipcMain.handle('drive:detect', () => detectDrivePath());
+ipcMain.handle('drive:getConfig', () => getDriveConfig(app.getPath('userData')));
+ipcMain.handle('drive:setConfig', (_, drivePath, mwtnFolder) =>
+  setDriveConfig(app.getPath('userData'), drivePath, mwtnFolder)
+);
+ipcMain.handle('dialog:selectFolder', () =>
+  dialog.showOpenDialog({
+    properties: ['openDirectory'],
+  })
+);
+ipcMain.handle('fs:listFolder', (_, folderPath) => require('fs').promises.readdir(folderPath));
+ipcMain.handle('fs:joinPath', (_, ...args) => path.join(...args));
 
 app.whenReady().then(createWindow);
 

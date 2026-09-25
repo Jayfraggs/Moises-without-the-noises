@@ -491,6 +491,204 @@
   color: var(--text-dim);
 }
 
+/* ── Detecting panel ───────────────────────────────────────────── */
+
+.sw-detecting-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 120px;
+}
+
+/* ── Form elements ────────────────────────────────────────────── */
+
+.sw-form-group {
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sw-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.sw-form-input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  transition: border-color 0.15s;
+}
+
+.sw-form-input:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgba(79, 182, 168, 0.15);
+}
+
+.sw-form-input:disabled {
+  background: var(--border);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.sw-form-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.sw-form-browse-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* ── Checkbox ─────────────────────────────────────────────────── */
+
+.sw-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin: 12px 0;
+}
+
+.sw-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--teal);
+}
+
+.sw-checkbox:hover {
+  color: var(--text);
+}
+
+/* ── Status boxes ─────────────────────────────────────────────── */
+
+.sw-status-box {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  align-items: flex-start;
+}
+
+.sw-status-box--success {
+  border-color: var(--teal);
+  background: rgba(79, 182, 168, 0.08);
+}
+
+.sw-status-icon {
+  font-size: 1.2rem;
+  color: var(--teal);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sw-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sw-status-title {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.sw-status-path {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text);
+  font-family: var(--font-data);
+  word-break: break-all;
+}
+
+/* ── Error boxes ──────────────────────────────────────────────── */
+
+.sw-error-box {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: rgba(214, 90, 74, 0.08);
+  border: 1px solid rgba(214, 90, 74, 0.3);
+  align-items: flex-start;
+}
+
+.sw-error-icon {
+  font-size: 1rem;
+  color: #d65a4a;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sw-error-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #d65a4a;
+  line-height: 1.4;
+}
+
+/* ── CTA buttons group ────────────────────────────────────────── */
+
+.sw-cta-buttons {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+  margin: 16px 0;
+}
+
+.sw-cta-buttons .sw-btn {
+  width: 100%;
+  text-align: center;
+}
+
+/* ── Actions group ────────────────────────────────────────────── */
+
+.sw-actions-group {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Disabled button state ─────────────────────────────────────── */
+
+.sw-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sw-btn:disabled:hover {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--bg);
+}
+
 /* ── Responsive ───────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
@@ -505,6 +703,15 @@
   .sw-guide-step {
     flex-direction: column;
     gap: 12px;
+  }
+
+  .sw-actions-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .sw-actions-group .sw-btn {
+    width: 100%;
   }
 }
 
