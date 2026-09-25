@@ -35,9 +35,9 @@ Note detection complete.)
  
 - AI Voice Studio: Access high-quality voices from real artists to cover your editing needs.
  
-- Export: Extract and share high-quality audio mixes and separated stems, including the metronome click-track. Extract audio stems for use in any track maker or with our voice remover.
+- Export: Extract and share high-quality audio mixes and separated stems, including the metronome click-track. Extract audio stems for use in any track maker or with our voice remover. ✅
 
-Populate the `.github\instructions\AGENTS-instructions.md`
+Populate the `.github\instructions\AGENTS-instructions.md` ✅
 
 add a feature that estimates the time to completion of load for full run
 
