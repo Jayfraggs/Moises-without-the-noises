@@ -75,6 +75,15 @@ export async function getImportStatus(jobId) {
   return jsonOrThrow(res);
 }
 
+export async function ingestZip(zipPath) {
+  const res = await fetch(`${BASE}/ingest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ zip_path: zipPath }),
+  });
+  return jsonOrThrow(res);
+}
+
 export async function patchLyrics(songId, words) {
   const res = await fetch(`${BASE}/songs/${songId}/lyrics`, {
     method: 'PATCH',

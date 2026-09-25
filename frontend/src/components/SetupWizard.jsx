@@ -12,11 +12,17 @@
  * Steps:
  *   1  Welcome
  *   2  System scan (auto-advances after 900 ms)
- *   3  Path selection (Colab vs Local — recommendation shown)
- *   4  Step-by-step guide for the chosen path
+ *   3  Colab info & confirmation
+ *   4  Drive for Desktop detection
+ *   5  Drive folder configuration (skipped if driveSkipped)
+ *   6  Path selection (Colab vs Local — recommendation shown)
+ *   7  Step-by-step guide for the chosen path
  */
 import React, { useState, useEffect, useRef } from 'react';
 import './SetupWizard.css';
+import { StepColab } from './wizard/StepColab';
+import { StepDriveInstall } from './wizard/StepDriveInstall';
+import { StepDriveFolder } from './wizard/StepDriveFolder';
 
 // ---------- System detection -----------------------------------------------
 
@@ -198,10 +204,11 @@ function SpecRow({ label, value, ok }) {
 // ---------- Main wizard ------------------------------------------------------
 
 export function SetupWizard({ onComplete }) {
-  const [step, setStep] = useState(1);         // 1..4
+  const [step, setStep] = useState(1);         // 1..6 (plus substeps in guide)
   const [path, setPath] = useState(null);      // 'colab' | 'local'
   const [subStep, setSubStep] = useState(1);
   const [specs, setSpecs] = useState(null);
+  const [driveSkipped, setDriveSkipped] = useState(false);
   const scanRef = useRef(false);
 
   // Step 2 — auto-scan then advance
@@ -211,22 +218,24 @@ export function SetupWizard({ onComplete }) {
     const detected = detectSpecs();
     const timer = setTimeout(() => {
       setSpecs(detected);
-      setStep(3);
+      setStep(3); // Advance to Colab step
     }, 900);
     return () => clearTimeout(timer);
   }, [step]);
 
   const score = specs ? scorePath(specs) : null;
   const guideSteps = path === 'colab' ? COLAB_STEPS : LOCAL_STEPS;
-  const totalSteps = 4;
+  const totalSteps = 6; // Welcome, Scan, Colab, Drive Install, Drive Folder, Path select, then Guide
 
   function choosePath(chosen) {
     setPath(chosen);
     setSubStep(1);
-    setStep(4);
+    // Step 6 is path selection, step 7 starts the guide
+    setStep(7);
   }
 
   function handleDone() {
+    localStorage.setItem('mwtn_wizard_complete', 'true');
     if (typeof onComplete === 'function') onComplete();
   }
 
@@ -269,10 +278,38 @@ export function SetupWizard({ onComplete }) {
             </div>
           )}
 
-          {/* ── Step 3: Path selection ── */}
-          {step === 3 && specs && score && (
+          {/* ── Step 3: Colab info ── */}
+          {step === 3 && (
+            <StepColab
+              onNext={() => setStep(4)}
+              onBack={() => setStep(1)}
+            />
+          )}
+
+          {/* ── Step 4: Drive installation ── */}
+          {step === 4 && (
+            <StepDriveInstall
+              onNext={() => setStep(5)}
+              onBack={() => setStep(3)}
+              onSkip={() => {
+                setDriveSkipped(true);
+                setStep(6); // Skip directly to path selection
+              }}
+            />
+          )}
+
+          {/* ── Step 5: Drive folder config (skip if driveSkipped) ── */}
+          {step === 5 && !driveSkipped && (
+            <StepDriveFolder
+              onNext={() => setStep(6)}
+              onBack={() => setStep(4)}
+            />
+          )}
+
+          {/* ── Step 6: Path selection ── */}
+          {step === 6 && specs && score && (
             <div className="sw-panel">
-              <StepIndicator current={2} total={totalSteps} />
+              <StepIndicator current={5} total={totalSteps} />
               <h2 className="sw-heading">Your system</h2>
 
               <div className="sw-specs">
@@ -357,17 +394,17 @@ export function SetupWizard({ onComplete }) {
               </div>
 
               <div className="sw-actions sw-actions--left">
-                <button className="sw-btn sw-btn--ghost" onClick={() => setStep(1)}>
+                <button className="sw-btn sw-btn--ghost" onClick={() => setStep(driveSkipped ? 4 : 5)}>
                   ← Back
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── Step 4: Guide ── */}
-          {step === 4 && path && (
+          {/* ── Step 7: Guide ── */}
+          {step === 7 && path && (
             <div className="sw-panel">
-              <StepIndicator current={subStep + 2} total={totalSteps + guideSteps.length - 2} />
+              <StepIndicator current={subStep + 5} total={totalSteps + guideSteps.length - 2} />
 
               <div className="sw-guide-header">
                 <div>
@@ -380,7 +417,7 @@ export function SetupWizard({ onComplete }) {
                 </div>
                 <button
                   className="sw-btn sw-btn--ghost"
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(6)}
                   aria-label="Switch path"
                 >
                   Switch ↩
@@ -411,7 +448,7 @@ export function SetupWizard({ onComplete }) {
                   className="sw-btn sw-btn--ghost"
                   onClick={() => {
                     if (subStep > 1) setSubStep((s) => s - 1);
-                    else setStep(3);
+                    else setStep(6);
                   }}
                 >
                   ← {subStep > 1 ? 'Prev' : 'Back'}

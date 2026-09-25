@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from ingest import ingest_zip
 from separation import run_separation
 from audio.bpm import detect_beats
 from audio.key_detection import detect_key
@@ -421,6 +422,26 @@ def import_status(job_id: str):
     if job_id not in import_jobs:
         raise HTTPException(404, f"No import job '{job_id}'")
     return import_jobs[job_id]
+
+
+class IngestBody(BaseModel):
+    zip_path: str
+
+
+@app.post("/api/ingest")
+def ingest_song(body: IngestBody):
+    """Ingest a fully processed ZIP whose structure matches the Colab output."""
+    zip_path = Path(body.zip_path)
+    if not zip_path.is_file():
+        raise HTTPException(status_code=400, detail=f"ZIP path does not exist: {body.zip_path}")
+
+    try:
+        manifest = ingest_zip(str(zip_path), str(DATA_DIR))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    song_id = manifest.get("song_id") or zip_path.stem
+    return {"song_id": song_id, "manifest": manifest}
 
 
 # --- Frontend static mount — MUST be last ------------------------------------

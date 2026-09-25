@@ -44,3 +44,10 @@ add a feature that estimates the time to completion of load for full run
 Also give the options to selectwhether or not the users want to decode the lyrics, what stems to seperate and which not, etc
 
 Start writing tests to see if the software is on track
+
+The settings button is the UI doesen't work (Perhaps API issue)
+The logs show 304 errors for 2 APIs (as 
+GET /api/user-profile 304 Not Modified (Mozilla/5.0 ...)
+GET /api/usage 304 Not Modified (Mozilla/5.0 ...)
+
+And also add the option to pull an already extracted .zip file into the app

@@ -15,6 +15,8 @@ import { SongSelector } from './components/SongSelector.jsx';
 import { StemChannel } from './components/StemControls.jsx';
 import { TransportControls } from './components/TransportControls.jsx';
 import { ImportSong } from './components/ImportSong.jsx';
+import { ImportDrive } from './components/ImportDrive.jsx';
+import { SongDetail } from './components/SongDetail.jsx';
 import SongInfoBar from './components/SongInfoBar.jsx';
 import { LyricsPanel } from './components/LyricsPanel.jsx';
 import ChordDisplay from './components/ChordDisplay.jsx';
@@ -25,9 +27,11 @@ import { exportStemAtPitch, triggerBrowserDownload } from './api.js';
 import { useOnboarding } from './hooks/useOnboarding.js';
 import { SetupWizard } from './components/SetupWizard.jsx';
 import ExportPanel from './components/ExportPanel.jsx';
+import Settings from './components/Settings.jsx';
 
 export default function App() {
   const [songs, setSongs] = useState([]);
+  const [selectedSong, setSelectedSong] = useState(null);
   const [selectedSongId, setSelectedSongId] = useState(null);
   const [manifest, setManifest] = useState(null);
   const [notesByStem, setNotesByStem] = useState({});
@@ -44,6 +48,7 @@ export default function App() {
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [metronomeVolume, setMetronomeVolume] = useState(0.8);
   const [metronomeAvailable, setMetronomeAvailable] = useState(true);
+  const [driveConfig, setDriveConfig] = useState(null);
 
   // Mirrors AudioEngine's internal mute/solo/volume state for React
   // rendering -- the engine itself doesn't trigger re-renders when its
@@ -86,7 +91,24 @@ export default function App() {
     refreshSongs();
   }, [refreshSongs]);
 
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.getDriveConfig) {
+      window.electronAPI.getDriveConfig().then(setDriveConfig).catch(console.error);
+    }
+  }, []);
+
+  const handleDriveImportComplete = (songId, newManifest) => {
+    setSongs(prev => {
+      if (prev.some(s => s.song_id === songId)) return prev;
+      return [...prev, newManifest];
+    });
+    setSelectedSong({ song_id: songId, manifest: newManifest });
+  };
+
   const handleSelectSong = async (songId) => {
+    const m = songs.find(s => s.song_id === songId) || null;
+    setSelectedSong({ song_id: songId, manifest: m });
+    
     setIsLoadingSong(true);
     setLoadError(null);
     setIsPlaying(false);
@@ -290,6 +312,7 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   // Export panel visibility
   const [showExport, setShowExport] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleSemitoneChange = (semitones) => {
     if (engineRef && engineRef.current && typeof engineRef.current.setPitch === 'function') {
@@ -327,20 +350,47 @@ export default function App() {
       <header className="app__header">
         <h1 className="app__title">Stem Practice</h1>
         <p className="app__subtitle">isolate a stem, read the note, play along</p>
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            aria-label="Open settings"
+            title="Settings"
+            className="btn btn-ghost"
+            onClick={() => setShowSettings(true)}
+          >
+            ⚙
+          </button>
+        </div>
       </header>
 
       <div className="app__body">
-        <aside className="app__sidebar">
-          <SongSelector
-            songs={songs}
-            selectedSongId={selectedSongId}
-            onSelect={handleSelectSong}
-            onDelete={handleDeleteSong}
+        {selectedSong ? (
+          <SongDetail
+            songId={selectedSong.song_id}
+            initialManifest={selectedSong.manifest}
+            engine={engine}
+            onBack={() => setSelectedSong(null)}
           />
-          <ImportSong onImportComplete={refreshSongs} />
-        </aside>
-
-        <main className="app__main">
+        ) : (
+          <>
+            <aside className="app__sidebar">
+              <SongSelector
+                songs={songs}
+                selectedSongId={selectedSongId}
+                onSelect={handleSelectSong}
+                onDelete={handleDeleteSong}
+              />
+              <ImportDrive 
+                songs={songs} 
+                onImportComplete={handleDriveImportComplete} 
+                driveConfig={driveConfig} 
+              />
+              <ImportSong onImportComplete={(songId, manifest) => {
+                refreshSongs();
+                if (songId) setSelectedSong({ song_id: songId, manifest });
+              }} />
+            </aside>
+    
+            <main className="app__main">
           {loadError && <div className="app__error">{loadError}</div>}
 
           {isLoadingSong && <div className="app__loading">Loading stems\u2026</div>}
@@ -430,6 +480,25 @@ export default function App() {
                   onClose={() => setShowExport(false)}
                 />
               )}
+
+              {showSettings && (
+                <Settings
+                  onClose={() => setShowSettings(false)}
+                  onScanRequested={async () => {
+                    // Trigger a refresh of songs by asking backend to ingest detected zips.
+                    // For now, refreshSongs will update the UI after scan action completes.
+                    // If electronAPI provides a drive scan, call it and then refresh.
+                    if (window.electronAPI?.scanDrive) {
+                      try {
+                        await window.electronAPI.scanDrive();
+                      } catch (e) {
+                        console.error('scanDrive failed', e);
+                      }
+                    }
+                    await refreshSongs();
+                  }}
+                />
+              )}
             </>
           )}
 
@@ -439,6 +508,8 @@ export default function App() {
             </div>
           )}
         </main>
+        </>
+        )}
       </div>
     </div>
   );
