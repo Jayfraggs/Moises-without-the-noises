@@ -7,8 +7,6 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const SPEED_STEPS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-
 export function TransportControls({
   engine,
   isPlaying,
@@ -21,7 +19,7 @@ export function TransportControls({
   onMetronomeVolumeChange,
 }) {
   const [position, setPosition] = useState(0);
-  const [speed, setSpeed] = useState(1.0);
+
   const [loopStart, setLoopStart] = useState(null);
   const [loopEnd, setLoopEnd] = useState(null);
   const rafRef = useRef(null);
@@ -39,12 +37,6 @@ export function TransportControls({
     const t = parseFloat(e.target.value);
     engine.seek(t);
     setPosition(t);
-  };
-
-  const handleSpeedChange = (e) => {
-    const rate = parseFloat(e.target.value);
-    setSpeed(rate);
-    engine.setPlaybackRate(rate);
   };
 
   const markLoopStart = () => {
@@ -92,20 +84,6 @@ export function TransportControls({
       </div>
 
       <div className="transport__sub-row">
-        <div className="transport__speed-control">
-          <label htmlFor="speed-select">Speed</label>
-          <select id="speed-select" value={speed} onChange={handleSpeedChange}>
-            {SPEED_STEPS.map((s) => (
-              <option key={s} value={s}>
-                {Math.round(s * 100)}%
-              </option>
-            ))}
-          </select>
-          {speed !== 1.0 && (
-            <span className="transport__speed-note">pitch shifts at this speed</span>
-          )}
-        </div>
-
         <div className="transport__loop-control">
           <button onClick={markLoopStart}>Set A</button>
           <button onClick={markLoopEnd}>Set B</button>

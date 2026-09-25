@@ -27,13 +27,20 @@ mwtn/
 │       ├── AudioEngine.js      # Web Audio API — playback, routing, stem mixing
 │       ├── api.js              # Fetch wrappers to the FastAPI backend
 │       └── components/
-│           ├── TransportControls.jsx
-│           ├── StemControls.jsx
-│           ├── NoteDisplay.jsx
-│           ├── LyricsPanel.jsx
-│           ├── SongInfoBar.jsx
-│           ├── SongSelector.jsx
-│           └── ImportSong.jsx
+│           ├── SetupWizard.jsx         # Full-screen first-run wizard (Colab vs Local path selection)
+│           ├── SetupWizard.css         # Standalone visual identity for the wizard
+│           ├── TransportControls.jsx   # Play/pause/seek/loop/metronome controls
+│           ├── StemControls.jsx        # Per-stem mute/solo/gain (alias: StemChannel)
+│           ├── SpeedControl.jsx        # Playback rate presets + slider (authoritative speed control)
+│           ├── PitchControl.jsx        # Semitone slider, key transposition preview, pitch export
+│           ├── CountInControl.jsx      # Beat count-in selector (0/1/2/4 beats before playback)
+│           ├── ExportPanel.jsx         # Export modal (single stem, custom mix, mix + click)
+│           ├── ChordDisplay.jsx        # Chord/tab display synced to playback position
+│           ├── NoteDisplay.jsx         # Hardware-tuner note readout, synced via rAF
+│           ├── LyricsPanel.jsx         # Word-level lyric sync (expects words[], getCurrentTime)
+│           ├── SongInfoBar.jsx         # Key / BPM badge row
+│           ├── SongSelector.jsx        # Song library sidebar list
+│           └── ImportSong.jsx          # Local file upload → POST /api/import
 ├── electron/
 │   └── main.js                 # Thin Electron shell — no business logic here
 ├── colab/

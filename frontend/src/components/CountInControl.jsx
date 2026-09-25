@@ -7,7 +7,7 @@ import React from 'react';
 // - currentCountInBeat: number (1-indexed)
 // - totalCountInBeats: number
 
-export default function CountInControl({ onCountInChange, isCountingIn = false, currentCountInBeat = 0, totalCountInBeats = 0 }) {
+export default function CountInControl({ onCountInChange, value = 0, isCountingIn = false, currentCountInBeat = 0, totalCountInBeats = 0 }) {
   const options = [0, 1, 2, 4];
 
   const containerStyle = {
@@ -65,10 +65,12 @@ export default function CountInControl({ onCountInChange, isCountingIn = false, 
               key={opt}
               onClick={() => onCountInChange && onCountInChange(opt)}
               title={opt === 0 ? 'Off' : `${opt} beat${opt > 1 ? 's' : ''}`}
-              aria-pressed={false}
+              aria-pressed={value === opt}
               style={{
                 ...btnBase,
-                background: 'transparent',
+                background: value === opt ? 'var(--amber, #e8a020)' : 'transparent',
+                color: value === opt ? '#0f0f0f' : 'var(--text-primary, #f0f0f0)',
+                fontWeight: value === opt ? 700 : 400,
                 padding: '6px 10px',
                 borderRight: '1px solid rgba(255,255,255,0.04)',
               }}

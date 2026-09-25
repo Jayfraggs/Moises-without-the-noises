@@ -1,0 +1,515 @@
+/*
+  SetupWizard.css
+  Visual concept: recording-booth darkness — deep charcoal field, amber
+  accent for the active path (mirrors the hardware tuner LED motif from
+  the main app), teal for interactive actions. Feels like the startup
+  screen of a piece of hardware, not a SaaS onboarding modal.
+
+  Deliberately distinct from App.css while sharing its token values
+  (injected by the parent document via :root). No CDN dependencies.
+*/
+
+/* ── Shell / backdrop ─────────────────────────────────────────── */
+
+.sw-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.sw-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  /* Subtle scanline texture — evokes a monitor, ties to the gear aesthetic */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.015) 2px,
+    rgba(255, 255, 255, 0.015) 4px
+  );
+}
+
+/* ── Frame ────────────────────────────────────────────────────── */
+
+.sw-frame {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.sw-frame__inner {
+  /* Subtle amber glow at top — like a power LED on a rack unit */
+  border-top: 2px solid var(--amber);
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(232, 163, 61, 0.06);
+  overflow: hidden;
+}
+
+/* ── Panel (content area) ─────────────────────────────────────── */
+
+.sw-panel {
+  padding: 36px 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 360px;
+}
+
+.sw-panel--center {
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Logo ─────────────────────────────────────────────────────── */
+
+.sw-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.sw-logo__mark {
+  font-family: var(--font-data);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--amber);
+  line-height: 1;
+}
+
+.sw-logo__sub {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
+/* ── Step indicator ───────────────────────────────────────────── */
+
+.sw-step-indicator {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.sw-step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.sw-step-dot--done {
+  background: var(--teal);
+  opacity: 0.5;
+}
+
+.sw-step-dot--active {
+  background: var(--amber);
+  transform: scale(1.25);
+}
+
+/* ── Typography ───────────────────────────────────────────────── */
+
+.sw-heading {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.sw-heading--mt {
+  margin-top: 4px;
+}
+
+.sw-body {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  max-width: 52ch;
+}
+
+/* ── Spec table ───────────────────────────────────────────────── */
+
+.sw-specs {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sw-spec-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.sw-spec-row:last-child {
+  border-bottom: none;
+}
+
+.sw-spec-row--warn {
+  background: rgba(214, 90, 74, 0.06);
+}
+
+.sw-spec-label {
+  color: var(--text-dim);
+}
+
+.sw-spec-value {
+  font-family: var(--font-data);
+  color: var(--text);
+}
+
+.sw-spec-flag {
+  font-size: 0.72rem;
+  color: var(--red);
+  font-weight: 700;
+}
+
+.sw-spec-flag--ok {
+  color: var(--teal);
+}
+
+/* ── Path selection cards ─────────────────────────────────────── */
+
+.sw-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.sw-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.sw-card--highlight {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px rgba(232, 163, 61, 0.15), 0 0 20px rgba(232, 163, 61, 0.06);
+}
+
+.sw-card--dim {
+  opacity: 0.7;
+}
+
+.sw-card--dim:hover {
+  opacity: 1;
+}
+
+.sw-card__badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--amber);
+  background: rgba(232, 163, 61, 0.1);
+  border: 1px solid rgba(232, 163, 61, 0.25);
+  border-radius: 4px;
+  padding: 3px 8px;
+  align-self: flex-start;
+}
+
+.sw-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.sw-card__sub {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: -6px;
+}
+
+.sw-card__body {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.sw-card__note {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: 5px;
+  line-height: 1.4;
+}
+
+.sw-card__note--good {
+  color: var(--teal);
+  background: rgba(79, 182, 168, 0.08);
+}
+
+.sw-card__note--warn {
+  color: #f6a623;
+  background: rgba(246, 166, 35, 0.08);
+}
+
+.sw-card__cta {
+  margin-top: auto;
+}
+
+/* ── Guide step ───────────────────────────────────────────────── */
+
+.sw-guide-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sw-guide-progress {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-family: var(--font-data);
+}
+
+.sw-guide-step {
+  display: flex;
+  gap: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  min-height: 130px;
+  align-items: flex-start;
+}
+
+.sw-guide-step--warn {
+  border-color: #f6a623;
+  background: rgba(246, 166, 35, 0.04);
+}
+
+.sw-guide-step__num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--amber);
+  color: var(--bg);
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-family: var(--font-data);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sw-guide-step__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.sw-guide-step__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sw-guide-step__body {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.sw-guide-step__body code {
+  background: var(--bg);
+  color: var(--amber);
+  font-family: var(--font-data);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.8em;
+}
+
+.sw-guide-step__body a {
+  color: var(--teal);
+  text-decoration: none;
+}
+
+.sw-guide-step__body a:hover {
+  text-decoration: underline;
+}
+
+.sw-guide-step__aside {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  opacity: 0.75;
+  line-height: 1.5;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+
+/* ── Progress track ───────────────────────────────────────────── */
+
+.sw-progress-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sw-progress-fill {
+  height: 100%;
+  background: var(--amber);
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+
+/* ── Action buttons ───────────────────────────────────────────── */
+
+.sw-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.sw-actions--left {
+  justify-content: flex-start;
+}
+
+.sw-actions--split {
+  justify-content: space-between;
+}
+
+.sw-btn {
+  border-radius: 6px;
+  padding: 9px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
+  border: 1px solid transparent;
+}
+
+.sw-btn--primary {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--bg);
+}
+
+.sw-btn--primary:hover {
+  background: #3ea396;
+  border-color: #3ea396;
+}
+
+.sw-btn--secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.sw-btn--secondary:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.sw-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.sw-btn--ghost:hover {
+  color: var(--text);
+}
+
+.sw-btn--done {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.sw-btn--done:hover {
+  background: #d4912b;
+  border-color: #d4912b;
+}
+
+/* ── Scan spinner ─────────────────────────────────────────────── */
+
+.sw-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--border);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: sw-spin 0.9s linear infinite;
+}
+
+@keyframes sw-spin {
+  to { transform: rotate(360deg); }
+}
+
+.sw-scan-label {
+  margin: 16px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .sw-panel {
+    padding: 24px 20px 20px;
+  }
+
+  .sw-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sw-guide-step {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-spinner { animation: none; border-top-color: var(--amber); }
+  .sw-progress-fill { transition: none; }
+  .sw-step-dot { transition: none; }
+}

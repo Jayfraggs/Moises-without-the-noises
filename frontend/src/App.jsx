@@ -23,7 +23,7 @@ import PitchControl from './components/PitchControl.jsx';
 import CountInControl from './components/CountInControl.jsx';
 import { exportStemAtPitch, triggerBrowserDownload } from './api.js';
 import { useOnboarding } from './hooks/useOnboarding.js';
-import { OnboardingWizard } from './components/OnboardingWizard.jsx';
+import { SetupWizard } from './components/SetupWizard.jsx';
 import ExportPanel from './components/ExportPanel.jsx';
 
 export default function App() {
@@ -322,7 +322,7 @@ export default function App() {
   return (
     <div className="app">
       {showOnboarding && (
-        <OnboardingWizard onComplete={completeOnboarding} />
+        <SetupWizard onComplete={completeOnboarding} />
       )}
       <header className="app__header">
         <h1 className="app__title">Stem Practice</h1>
@@ -372,24 +372,26 @@ export default function App() {
                 </button>
               </div>
 
-              <div style={{ marginTop: 10 }}>
+              <div className="controls-row">
                 <SpeedControl currentRate={playbackRate} onRateChange={handleRateChange} />
-              </div>
-
-              <div style={{ marginTop: 10, display: 'flex', gap: 12, alignItems: 'center' }}>
-                <CountInControl
-                  onCountInChange={handleCountInChange}
-                  isCountingIn={isCountingIn}
-                  currentCountInBeat={currentCountInBeat}
-                  totalCountInBeats={countInBeats}
-                />
-
+                <div className="controls-row__divider" />
+                <div className="controls-row__count-in">
+                  <span className="controls-row__label">Count In</span>
+                  <CountInControl
+                    onCountInChange={handleCountInChange}
+                    value={countInBeats}
+                    isCountingIn={isCountingIn}
+                    currentCountInBeat={currentCountInBeat}
+                    totalCountInBeats={countInBeats}
+                  />
+                </div>
+                <div className="controls-row__divider" />
                 <PitchControl
                   currentKey={keyInfo?.key ?? null}
                   onSemitoneChange={handleSemitoneChange}
                   onExportAtPitch={(n) => handleExportAtPitch(n)}
                 />
-                {isExporting && <div style={{ color: '#e8a020', marginTop: 8 }}>Exporting stems…</div>}
+                {isExporting && <span className="controls-row__exporting">Exporting…</span>}
               </div>
 
               <div className="mixing-console">
@@ -412,7 +414,11 @@ export default function App() {
 
               <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginTop: 12 }}>
                 <ChordDisplay chords={chords} getCurrentTime={() => engine.getCurrentTime()} />
-                <LyricsPanel engine={engine} lyrics={lyrics} isPlaying={isPlaying} />
+                <LyricsPanel
+                  words={lyrics?.words ?? null}
+                  getCurrentTime={() => engine.getCurrentTime()}
+                  isPlaying={isPlaying}
+                />
               </div>
 
               {/* Export panel mount (insertion point) */}
