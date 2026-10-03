@@ -60,8 +60,8 @@ function loadWithRetry(win, retriesLeft) {
 
 ipcMain.handle('drive:detect', () => detectDrivePath());
 ipcMain.handle('drive:getConfig', () => getDriveConfig(app.getPath('userData')));
-ipcMain.handle('drive:setConfig', (_, drivePath, mwtnFolder) =>
-  setDriveConfig(app.getPath('userData'), drivePath, mwtnFolder)
+ipcMain.handle('drive:setConfig', (_, drivePath, mwtnFolder, defaultModel) =>
+  setDriveConfig(app.getPath('userData'), drivePath, mwtnFolder, defaultModel)
 );
 ipcMain.handle('dialog:selectFolder', () =>
   dialog.showOpenDialog({

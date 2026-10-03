@@ -1,123 +1,121 @@
 <#
 .SYNOPSIS
-    Starts the stem practice tool. Run activate.ps1 first (once).
+    Start mwtn. Run .\activate.ps1 first (once, on first setup).
 
 .DESCRIPTION
-    Starts uvicorn (FastAPI backend) in its own window so you can see
-    backend logs/errors, waits for it to come up, then launches the
-    Electron shell in the foreground. When you close the Electron window,
-    this script stops the backend process too -- otherwise uvicorn would
-    keep running invisibly and the next run.ps1 would fail to bind the port.
-
-    Auto-rebuild: before launching, this script compares the newest
-    file under frontend/src/ (and vite.config.js / package.json) against
-    frontend/dist/index.html. If anything is newer the frontend is
-    rebuilt automatically -- no manual `npm run build` needed.
-    Uses `cmd /c npm run build` to sidestep PowerShell execution-policy
-    restrictions on npm.
+    1. Checks the venv exists and Activate.ps1 is present.
+    2. Checks frontend/static/index.html is present.
+    3. Starts uvicorn (FastAPI backend) in a named background window.
+    4. Polls http://127.0.0.1:8000/api/songs until it responds (up to 30 s).
+    5. Opens the app in Electron (if installed) or prints the browser URL
+       and opens it in the default browser.
+    6. Kills the backend process cleanly when Electron closes (or on Ctrl+C).
 #>
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path ".\venv\Scripts\Activate.ps1")) {
-    Write-Host "ERROR: venv not found. Run .\activate.ps1 first." -ForegroundColor Red
+Write-Host ""
+Write-Host "=== mwtn ===" -ForegroundColor Cyan
+Write-Host ""
+
+# ── Pre-flight: venv ──────────────────────────────────────────────────────────
+
+$venvActivate = ".\venv\Scripts\Activate.ps1"
+$venvPython   = ".\venv\Scripts\python.exe"
+
+if (-not (Test-Path $venvPython)) {
+    Write-Host "ERROR: venv not found or incomplete." -ForegroundColor Red
+    Write-Host "       Run .\activate.ps1 first to set it up." -ForegroundColor Yellow
+    exit 1
+}
+if (-not (Test-Path $venvActivate)) {
+    Write-Host "ERROR: venv\Scripts\Activate.ps1 is missing." -ForegroundColor Red
+    Write-Host "       Run .\activate.ps1 to repair the venv." -ForegroundColor Yellow
     exit 1
 }
 
-# --- Frontend staleness check + auto-rebuild ------------------------------------
-#
-# Compare the newest mtime across frontend/src/**/* plus vite.config.js and
-# package.json against frontend/dist/index.html. Rebuild whenever src is newer
-# or dist doesn't exist yet.
+# ── Pre-flight: frontend ──────────────────────────────────────────────────────
 
-$distIndex = ".\frontend\dist\index.html"
-
-if (-not (Test-Path $distIndex)) {
-    Write-Host "No dist found -- building frontend for the first time..." -ForegroundColor Cyan
-    Push-Location frontend
-    cmd /c npm run build
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: frontend build failed. Check the output above." -ForegroundColor Red
-        Pop-Location
-        exit 1
-    }
-    Pop-Location
-} else {
-    $distTime = (Get-Item $distIndex).LastWriteTimeUtc
-
-    # Gather all source files that should trigger a rebuild when changed
-    $srcFiles = @(
-        Get-ChildItem -Path ".\frontend\src" -Recurse -File
-        Get-Item ".\frontend\vite.config.js" -ErrorAction SilentlyContinue
-        Get-Item ".\frontend\package.json"   -ErrorAction SilentlyContinue
-    ) | Where-Object { $_ -ne $null }
-
-    $newestSrc = ($srcFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
-
-    if ($newestSrc -gt $distTime) {
-        Write-Host "Source files changed since last build -- rebuilding frontend..." -ForegroundColor Cyan
-        Push-Location frontend
-        cmd /c npm run build
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: frontend build failed. Check the output above." -ForegroundColor Red
-            Pop-Location
-            exit 1
-        }
-        Pop-Location
-        Write-Host "Frontend rebuilt successfully." -ForegroundColor Green
-    } else {
-        Write-Host "Frontend is up to date (no rebuild needed)." -ForegroundColor Green
-    }
-}
-
-if (-not (Test-Path $distIndex)) {
-    Write-Host "ERROR: dist/index.html still missing after build attempt." -ForegroundColor Red
+if (-not (Test-Path ".\frontend\static\index.html")) {
+    Write-Host "ERROR: frontend\static\index.html not found." -ForegroundColor Red
+    Write-Host "       Make sure the project files are intact." -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "Starting backend..." -ForegroundColor Cyan
+Write-Host "Frontend : OK" -ForegroundColor Green
 
-$backendProcess = Start-Process powershell `
-    -ArgumentList "-NoExit", "-Command", "& '.\venv\Scripts\Activate.ps1'; cd backend; uvicorn main:app --host 127.0.0.1 --port 8000" `
+# ── Start backend ─────────────────────────────────────────────────────────────
+
+Write-Host "Starting mwtn backend…" -ForegroundColor Cyan
+
+$activatePath = (Resolve-Path $venvActivate).Path
+$backendPath  = (Resolve-Path ".\backend").Path
+
+$backendCmd = `
+  "`$host.UI.RawUI.WindowTitle = 'mwtn backend'; " + `
+  "& '$activatePath'; " + `
+  "Set-Location '$backendPath'; " + `
+  "uvicorn main:app --host 127.0.0.1 --port 8000"
+
+$backendProc = Start-Process powershell `
+    -ArgumentList "-NoExit", "-Command", $backendCmd `
     -PassThru
 
-# Poll the backend instead of a fixed sleep -- startup time varies a lot
-# depending on whether torch/demucs are already warm in disk cache.
-$maxWaitSeconds = 30
-$waited = 0
-$backendUp = $false
+# ── Poll until backend is up ──────────────────────────────────────────────────
 
-Write-Host "Waiting for backend to come up..."
-while ($waited -lt $maxWaitSeconds) {
-    try {
-        $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/songs" -UseBasicParsing -TimeoutSec 2
-        if ($response.StatusCode -eq 200) {
-            $backendUp = $true
-            break
-        }
-    } catch {
-        # Not up yet -- expected during startup, keep polling.
-    }
+$maxWait = 30
+$waited  = 0
+$up      = $false
+
+Write-Host "Waiting for backend" -NoNewline
+while ($waited -lt $maxWait) {
     Start-Sleep -Seconds 1
     $waited++
+    Write-Host "." -NoNewline
+    try {
+        $r = Invoke-WebRequest `
+            -Uri "http://127.0.0.1:8000/api/songs" `
+            -UseBasicParsing `
+            -TimeoutSec 2 `
+            -ErrorAction Stop
+        if ($r.StatusCode -eq 200) { $up = $true; break }
+    } catch { }
 }
 
-if (-not $backendUp) {
-    Write-Host "WARNING: backend didn't respond within $maxWaitSeconds seconds." -ForegroundColor Yellow
-    Write-Host "Launching Electron anyway -- it has its own retry logic and will show" -ForegroundColor Yellow
-    Write-Host "an error if the backend truly failed. Check the backend window for errors." -ForegroundColor Yellow
+Write-Host ""
+
+if ($up) {
+    Write-Host "Backend  : up at http://127.0.0.1:8000" -ForegroundColor Green
 } else {
-    Write-Host "Backend is up." -ForegroundColor Green
+    Write-Host "WARNING  : backend didn't respond in ${maxWait}s." -ForegroundColor Yellow
+    Write-Host "           Check the 'mwtn backend' window for errors." -ForegroundColor Yellow
 }
 
-Write-Host "Starting Electron shell..." -ForegroundColor Cyan
-Push-Location electron
-try {
-    cmd /c npm start
-} finally {
-    Pop-Location
-    Write-Host "Electron closed. Stopping backend..." -ForegroundColor Cyan
-    if ($backendProcess -and -not $backendProcess.HasExited) {
-        Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
+# ── Launch app ────────────────────────────────────────────────────────────────
+
+$electronReady = (Test-Path ".\electron\node_modules") -and (Test-Path ".\electron\package.json")
+
+if ($electronReady) {
+    Write-Host "Launching Electron…" -ForegroundColor Cyan
+    Push-Location electron
+    try {
+        cmd /c npm start
+    } finally {
+        Pop-Location
+        Write-Host ""
+        Write-Host "Electron closed. Stopping backend…" -ForegroundColor Cyan
+        if ($backendProc -and -not $backendProc.HasExited) {
+            Stop-Process -Id $backendProc.Id -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host "mwtn stopped." -ForegroundColor Green
     }
+} else {
+    Write-Host ""
+    Write-Host "Electron not installed — opening in your default browser." -ForegroundColor Yellow
+    Write-Host "App URL : http://127.0.0.1:8000" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Press Ctrl+C here to stop the backend when you're done." -ForegroundColor Yellow
+    Write-Host ""
+    try { Start-Process "http://127.0.0.1:8000" } catch { }
+    try { Wait-Process -Id $backendProc.Id } catch { }
 }

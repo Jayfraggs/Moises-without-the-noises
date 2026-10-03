@@ -1,124 +1,158 @@
 <#
 .SYNOPSIS
-    One-time setup for the stem practice tool. Run this once while
-    connected to the internet. After it completes, run.ps1/run.bat work
-    fully offline.
+    One-time setup for mwtn. Run this once, then use run.ps1 to start the app.
 
 .DESCRIPTION
-    Does five things, in order:
-      1. Creates a Python venv and installs backend deps (FastAPI, Demucs,
-         librosa, CPU-only torch).
-      2. Installs frontend npm deps and builds the React app to
-         frontend/dist/ (the backend serves this directly -- no separate
-         frontend server needed at runtime).
-         Note: run.ps1 auto-rebuilds whenever src/ is newer than dist/,
-         so you only need to manually build here on the very first run.
-      3. Installs Electron's npm deps.
-      4. Downloads the Demucs "htdemucs" model weights. This is the part
-         that specifically needs internet -- Demucs pulls pretrained
-         weights from Meta's model hub on first use, not from a single
-         static file you could just Invoke-WebRequest. Forcing the
-         download here, explicitly, means the model is cached before you
-         ever try to use the app offline. If you re-run this script later,
-         this step is fast (cache hit), not a re-download.
-      5. Prints next steps.
+    1. Validates Python 3.10+ is on PATH.
+    2. Recreates the venv if it's broken (missing Activate.ps1) or creates it fresh.
+    3. Installs backend Python dependencies into the venv.
+    4. Installs Electron npm dependencies (optional — for the desktop wrapper).
+    5. Verifies ffmpeg is reachable and prints a clear warning if not.
+    6. Prints next steps.
 
-    Safe to re-run -- venv creation and pip/npm installs are idempotent.
+    Safe to re-run. If the venv is healthy it is reused; only broken venvs
+    are deleted and rebuilt.
+
+.NOTES
+    torch and demucs are NOT installed by default — mwtn uses Google Colab
+    for ML processing. To enable the slow local-import path, uncomment those
+    lines in backend\requirements.txt and re-run this script.
 #>
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Stem Practice Tool: Setup ===" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "=== mwtn: Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
-# --- 1. Python venv + backend deps ---
+# ── 1. Python 3.10+ check ─────────────────────────────────────────────────────
 
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pythonCmd) {
-    Write-Host "ERROR: Python not found on PATH. Install Python 3.10+ and re-run." -ForegroundColor Red
+    Write-Host "ERROR: 'python' not found on PATH." -ForegroundColor Red
+    Write-Host "       Install Python 3.10+ from https://python.org and re-run." -ForegroundColor Yellow
     exit 1
 }
 
-$pyVersionOutput = (python --version) 2>&1
-Write-Host "Found $pyVersionOutput"
+$pyVerRaw  = (python --version) 2>&1
+$pyVerStr  = ($pyVerRaw -replace 'Python ', '')
+$pyParts   = $pyVerStr.Split('.')
+$pyMajor   = [int]$pyParts[0]
+$pyMinor   = [int]$pyParts[1]
 
-if (-not (Test-Path ".\venv")) {
-    Write-Host "Creating virtual environment..."
+Write-Host "Python: $pyVerRaw" -ForegroundColor Green
+
+if ($pyMajor -lt 3 -or ($pyMajor -eq 3 -and $pyMinor -lt 10)) {
+    Write-Host "ERROR: Python 3.10 or newer is required (found $pyVerStr)." -ForegroundColor Red
+    exit 1
+}
+
+# ── 2. Venv: create or repair ─────────────────────────────────────────────────
+
+$venvActivate = ".\venv\Scripts\Activate.ps1"
+$venvPython   = ".\venv\Scripts\python.exe"
+
+$needsCreate = $true
+if (Test-Path $venvPython) {
+    if (Test-Path $venvActivate) {
+        Write-Host "Virtual environment OK — reusing." -ForegroundColor Green
+        $needsCreate = $false
+    } else {
+        Write-Host "Virtual environment is incomplete (Activate.ps1 missing). Rebuilding…" -ForegroundColor Yellow
+        Remove-Item -Recurse -Force ".\venv" -ErrorAction SilentlyContinue
+    }
+} elseif (Test-Path ".\venv") {
+    Write-Host "Virtual environment folder exists but Python binary is missing. Rebuilding…" -ForegroundColor Yellow
+    Remove-Item -Recurse -Force ".\venv" -ErrorAction SilentlyContinue
+}
+
+if ($needsCreate) {
+    Write-Host "Creating virtual environment…"
     python -m venv venv
-} else {
-    Write-Host "Virtual environment already exists, reusing it."
-}
-
-Write-Host "Activating virtual environment..."
-& ".\venv\Scripts\Activate.ps1"
-
-Write-Host "Installing backend dependencies (torch + demucs are large, this can take several minutes)..." -ForegroundColor Cyan
-python -m pip install --upgrade pip
-pip install -r backend\requirements.txt
-
-# --- 2. Frontend deps + build ---
-
-$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-if (-not $npmCmd) {
-    Write-Host "ERROR: npm not found on PATH. Install Node.js 18+ and re-run." -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Installing frontend dependencies..." -ForegroundColor Cyan
-Push-Location frontend
-npm install
-# Build once now. After this, run.ps1 auto-rebuilds whenever frontend/src/**
-# is newer than dist/index.html -- so you won't need to re-run this step
-# unless you reinstall node_modules.
-Write-Host "Building frontend for production (first-time build)..."
-npm run build
-Pop-Location
-
-if (-not (Test-Path ".\frontend\dist\index.html")) {
-    Write-Host "ERROR: frontend build didn't produce dist/index.html. Check the npm output above." -ForegroundColor Red
-    exit 1
-}
-
-# --- 3. Electron deps ---
-
-Write-Host "Installing Electron dependencies..." -ForegroundColor Cyan
-Push-Location electron
-npm install
-Pop-Location
-
-# --- 4. Demucs model download (LOCAL PATH ONLY) ---
-#
-# This step is only needed if you are running Demucs locally (POST /api/import).
-# If you are using the Google Colab path, demucs is not installed locally and
-# this step is intentionally skipped.
-
-Write-Host ""
-python -c "import demucs" 2>&1 | Out-Null
-$demucsInstalled = ($LASTEXITCODE -eq 0)
-
-if ($demucsInstalled) {
-    Write-Host "Downloading Demucs model (htdemucs, ~80MB)..." -ForegroundColor Cyan
-    Write-Host "This is the step that specifically requires internet access."
-    python -c "from demucs.pretrained import get_model; get_model('htdemucs'); print('Model cached successfully.')"
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: model download failed. Check your internet connection and re-run activate.ps1." -ForegroundColor Red
+    if (-not (Test-Path $venvActivate)) {
+        Write-Host "ERROR: venv was created but Activate.ps1 is still missing." -ForegroundColor Red
+        Write-Host "       Try running: python -m venv --clear venv" -ForegroundColor Yellow
         exit 1
     }
-} else {
-    Write-Host "Skipping Demucs model download - demucs is not installed (Colab path selected)." -ForegroundColor Yellow
-    Write-Host "To cache model weights locally, uncomment demucs in backend\requirements.txt and re-run this script."
+    Write-Host "Virtual environment created." -ForegroundColor Green
 }
 
+# ── 3. Activate + install deps ────────────────────────────────────────────────
 
-# --- 5. Done ---
+Write-Host "Activating virtual environment…"
+& $venvActivate
+
+Write-Host "Upgrading pip…"
+python -m pip install --upgrade pip --quiet
+
+Write-Host "Installing backend dependencies…" -ForegroundColor Cyan
+pip install -r backend\requirements.txt
+
+Write-Host "Backend dependencies installed." -ForegroundColor Green
+
+# ── 4. Frontend check ─────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "=== Setup complete ===" -ForegroundColor Green
-Write-Host "Run .\run.ps1 (or run.bat) to start the app. It will now work fully offline."
+if (Test-Path ".\frontend\static\index.html") {
+    Write-Host "Frontend: OK (frontend\static\index.html found)" -ForegroundColor Green
+} else {
+    Write-Host "WARNING: frontend\static\index.html not found." -ForegroundColor Yellow
+    Write-Host "         Make sure you extracted the full project zip." -ForegroundColor Yellow
+}
+
+# ── 5. Electron (optional) ────────────────────────────────────────────────────
+
+$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+if ($npmCmd -and (Test-Path ".\electron\package.json")) {
+    Write-Host "Installing Electron dependencies…" -ForegroundColor Cyan
+    Push-Location electron
+    npm install --silent 2>&1 | Out-Null
+    Pop-Location
+    Write-Host "Electron ready." -ForegroundColor Green
+} else {
+    Write-Host "Electron: skipped (npm not found or electron/package.json missing)." -ForegroundColor Yellow
+    Write-Host "          The app works in your browser without Electron." -ForegroundColor Yellow
+}
+
+# ── 6. ffmpeg check ───────────────────────────────────────────────────────────
+
+$ffmpegCmd = Get-Command ffmpeg -ErrorAction SilentlyContinue
+if ($ffmpegCmd) {
+    Write-Host "ffmpeg: found at $($ffmpegCmd.Source)" -ForegroundColor Green
+} else {
+    Write-Host ""
+    Write-Host "WARNING: ffmpeg not found on PATH." -ForegroundColor Yellow
+    Write-Host "         ffmpeg is required for audio export (mixdown, stems zip)." -ForegroundColor Yellow
+    Write-Host "         Install it from https://ffmpeg.org/download.html" -ForegroundColor Yellow
+    Write-Host "         Then add it to your PATH and re-run activate.ps1." -ForegroundColor Yellow
+}
+
+# ── 7. Summary ────────────────────────────────────────────────────────────────
+
 Write-Host ""
-Write-Host "To add songs:"
-Write-Host "  - Fast: process a song in colab_notebook.ipynb, then extract the output"
-Write-Host "    zip into backend\data\"
-Write-Host "  - Slow but fully local: use the 'Import a song' button in the app itself"
-Write-Host "    (runs Demucs on this machine, expect 15-40 min per song on CPU)"
+Write-Host "=== mwtn: Setup complete ===" -ForegroundColor Green
+Write-Host ""
+Write-Host "HOW TO ADD SONGS (recommended — Colab GPU, free):" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  1. Open colab\mwtn_notebook.ipynb in Google Colab."
+Write-Host "     Runtime → Change runtime type → T4 GPU (free tier works)."
+Write-Host ""
+Write-Host "  2. Edit Cell 3: set DRIVE_FILE_PATH to your song in Google Drive."
+Write-Host "     Run all cells (takes ~2 min on GPU)."
+Write-Host ""
+Write-Host "  3. The output ZIP is saved to your Google Drive automatically."
+Write-Host "     Download it, then drag it onto the mwtn window — done."
+Write-Host ""
+Write-Host "  Or: extract the ZIP so backend\data\<song_id>\manifest.json exists."
+Write-Host "      The app picks it up with no restart."
+Write-Host ""
+Write-Host "  ⚠  First Colab run downloads ~3.5 GB (Demucs + Whisper models)."
+Write-Host "     Do that on Wi-Fi." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "ALTERNATIVE (local, CPU-only, slow):"
+Write-Host "  Uncomment torch + demucs in backend\requirements.txt, re-run activate.ps1,"
+Write-Host "  then use the Import button in the mwtn window."
+Write-Host ""
+Write-Host "START THE APP:"
+Write-Host "  .\run.ps1" -ForegroundColor Cyan
+Write-Host ""

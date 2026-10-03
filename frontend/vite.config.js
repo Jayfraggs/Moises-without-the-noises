@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import copy from 'rollup-plugin-copy';
@@ -7,6 +8,11 @@ import copy from 'rollup-plugin-copy';
 // headaches. The production build (used by run.ps1/run.bat) doesn't need
 // this proxy since FastAPI serves the built frontend itself, same origin.
 export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.js'],
+  },
   plugins: [react()],
   server: {
     port: 5173,

@@ -22,3 +22,24 @@ numpy>=2.0
 
 # ffmpeg-python — only needed by Whisper for audio decoding. Comment in with Whisper.
 # ffmpeg-python==0.2.0
+
+# ─── Optional separation engines ─────────────────────────────────────────────
+# Each engine is opt-in. Uncomment the line for the engine you want to use
+# locally (POST /api/import). For Colab, uncomment the matching !pip install
+# in the notebook's Cell 1 instead.
+#
+# SPLEETER (Deezer — MIT). Pulls TensorFlow (~500 MB). Python 3.8–3.11 only.
+#   pip install spleeter
+#
+# OPEN-UNMIX (Inria — MIT). PyTorch + torchaudio. ~400 MB model on first run.
+#   pip install openunmix torchaudio
+#
+# MDX-NET via audio-separator (karaokenerds — MIT). ONNX Runtime. ~350 MB per model.
+#   pip install "audio-separator[cpu]"
+#   For GPU: pip install "audio-separator[gpu]"
+#
+# BS-ROFORMER (openmirlab/bs-roformer-infer — MIT). ~400 MB checkpoint on first run.
+#   pip install bs-roformer-infer
+#
+# MEL-BAND ROFORMER (openmirlab/melband-roformer-infer — MIT). ~300 MB on first run.
+#   pip install melband-roformer-infer

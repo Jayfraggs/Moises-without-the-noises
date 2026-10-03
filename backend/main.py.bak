@@ -1,0 +1,1166 @@
+"""
+main.py — FastAPI backend for Moises without the Noises (mwtn).
+
+API surface is now at parity with StemDeck's app/api layer:
+
+  Songs / library
+    GET  /api/songs                         list all manifests
+    GET  /api/songs/{id}/manifest           read manifest
+    DELETE /api/songs/{id}                  delete song + stems
+
+  Stems
+    GET  /api/songs/{id}/stems/{name}       download WAV
+    GET  /api/songs/{id}/stems/{name}.mp3   cached MP3 transcode
+    GET  /api/songs/{id}/stems/{name}/waveform  pre-computed peaks
+    GET  /api/songs/{id}/peaks              peaks.json (all stems)
+
+  Analysis
+    GET  /api/songs/{id}/beats              beat grid (with user edits)
+    PATCH /api/songs/{id}/beats             persist edited grid
+    DELETE /api/songs/{id}/beats            reset to detected grid
+    GET  /api/songs/{id}/key                key + LUFS + dynamic range
+    GET  /api/songs/{id}/lyrics             Whisper word-level lyrics
+    PATCH /api/songs/{id}/lyrics            save lyric edits
+    GET  /api/songs/{id}/chords             chord data
+    GET  /api/songs/{id}/sections           section data
+    PATCH /api/songs/{id}/sections          save/validate sections
+    GET  /api/songs/{id}/notes/{stem}       note extraction data
+
+  Export
+    GET  /api/songs/{id}/mixdown.{ext}      ffmpeg mixdown (wav/mp3/flac/ogg)
+    GET  /api/songs/{id}/stems/all.zip      bundle stems as zip
+    POST /api/songs/{id}/stems/{name}/export  pitch-shift/time-stretch single stem
+
+  Events (SSE)
+    GET  /api/songs/{id}/events             job progress stream
+
+  Import
+    POST /api/import                        local Demucs import (background job)
+    GET  /api/import/{job_id}/status        poll import job
+    POST /api/ingest                        ingest pre-processed zip
+    POST /api/ingest/upload                 upload + ingest zip
+
+  Config
+    GET  /api/config                        model list, defaults
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import shutil
+import tempfile
+import threading
+import uuid
+import zipfile
+from io import BytesIO
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from ingest import ingest_zip
+from separation import run_separation, SUPPORTED_MODELS, DEFAULT_MODEL
+from audio.bpm import detect_beats
+from audio.key_detection import detect_key
+from audio.pitch import pitch_shift_wav, time_stretch_wav
+from audio.waveform_scan import scan_stem
+from audio.sections import normalize_sections, validate_sections
+from audio.collect import (
+    compute_stem_peaks,
+    compute_stem_presence,
+    compute_stem_presence_from_wavs,
+    merge_stem_peaks,
+)
+from audio.errors import classify_failure
+
+BASE_DIR    = Path(__file__).parent
+DATA_DIR    = BASE_DIR / "data"
+CACHE_DIR   = BASE_DIR / "_cache"
+IMPORT_TMP  = BASE_DIR / "_import_tmp"
+# Prefer the new vanilla JS static/ dir; fall back to legacy Vite dist/.
+_STATIC_DIR = BASE_DIR.parent / "frontend" / "static"
+_DIST_DIR   = BASE_DIR.parent / "frontend" / "dist"
+FRONTEND    = _STATIC_DIR if _STATIC_DIR.is_dir() else _DIST_DIR
+
+for d in (DATA_DIR, CACHE_DIR, IMPORT_TMP):
+    d.mkdir(exist_ok=True)
+
+import_jobs: dict[str, dict] = {}
+
+# ── Manifest helpers ──────────────────────────────────────────────────────────
+
+def _patch_manifest(song_dir: Path, updates: dict) -> None:
+    """
+    Atomically update manifest.json with *only the keys in `updates` that are
+    currently absent or None*. Existing fields are never overwritten so that
+    manually curated metadata is preserved.
+    """
+    manifest_path = song_dir / "manifest.json"
+    if not manifest_path.exists():
+        return
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    changed = False
+    for k, v in updates.items():
+        if manifest.get(k) is None and v is not None:
+            manifest[k] = v
+            changed = True
+    if not changed:
+        return
+    tmp = manifest_path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(manifest_path)
+
+
+# ── SSE helpers ──────────────────────────────────────────────────────────────
+_MAX_SSE_SECONDS = 4 * 3600
+_MAX_SSE = 200
+_sse_active = 0
+
+
+def _claim_sse() -> None:
+    global _sse_active
+    if _sse_active >= _MAX_SSE:
+        raise HTTPException(503, "too many concurrent streams")
+    _sse_active += 1
+
+
+def _release_sse() -> None:
+    global _sse_active
+    _sse_active -= 1
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
+app = FastAPI(title="mwtn API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ── Config ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/config")
+def get_config():
+    return {
+        "stem_names": list(("vocals", "drums", "bass", "guitar", "piano", "other")),
+        "extra_stem_names": ["lead_vocals", "backing_vocals"],
+        "separation_models": {
+            name: {
+                "stems": info["stems"],
+                "description": info["description"],
+                "engine": info["engine"],
+                "pip_hint": info["pip_hint"],
+                "data_cost_mb": info["data_cost_mb"],
+            }
+            for name, info in SUPPORTED_MODELS.items()
+        },
+        "default_model": DEFAULT_MODEL,
+    }
+
+
+# ── Song library ──────────────────────────────────────────────────────────────
+
+@app.get("/api/songs")
+def list_songs():
+    songs = []
+    for d in sorted(DATA_DIR.iterdir()):
+        mf = d / "manifest.json"
+        if mf.exists():
+            songs.append(json.loads(mf.read_text()))
+    return songs
+
+
+@app.get("/api/songs/{song_id}/manifest")
+def get_manifest(song_id: str):
+    p = DATA_DIR / song_id / "manifest.json"
+    if not p.exists():
+        raise HTTPException(404, f"No manifest for '{song_id}'")
+    return json.loads(p.read_text())
+
+
+@app.delete("/api/songs/{song_id}")
+def delete_song(song_id: str):
+    d = DATA_DIR / song_id
+    if not d.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    shutil.rmtree(d)
+    return {"deleted": song_id}
+
+
+# ── Peaks (waveform display) ──────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/peaks")
+def get_peaks(song_id: str, request: Request):
+    """All-stems peaks.json — same ETag-based revalidation as StemDeck."""
+    p = (DATA_DIR / song_id / "peaks.json").resolve()
+    if not p.is_file() or not p.is_relative_to(DATA_DIR.resolve()):
+        raise HTTPException(404, "peaks not found")
+    st = p.stat()
+    etag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+    headers = {"Cache-Control": "no-cache", "ETag": etag}
+    offered = request.headers.get("if-none-match", "")
+    if offered.strip() == "*" or etag in {
+        t.strip().removeprefix("W/") for t in offered.split(",")
+    }:
+        return Response(status_code=304, headers=headers)
+    return FileResponse(str(p), media_type="application/json", headers=headers)
+
+
+# ── Stems ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/stems/{stem_name}")
+def get_stem(song_id: str, stem_name: str):
+    p = DATA_DIR / song_id / f"{stem_name}.wav"
+    if not p.exists():
+        raise HTTPException(404, f"No stem '{stem_name}'")
+    return FileResponse(str(p), media_type="audio/wav")
+
+
+@app.get("/api/songs/{song_id}/stems/{stem_name}.mp3")
+async def get_stem_mp3(song_id: str, stem_name: str):
+    """MP3 transcode, cached alongside the WAV."""
+    wav = DATA_DIR / song_id / f"{stem_name}.wav"
+    if not wav.exists():
+        raise HTTPException(404, f"No stem '{stem_name}'")
+    mp3 = wav.with_suffix(".mp3")
+    if not mp3.is_file() or mp3.stat().st_mtime < wav.stat().st_mtime:
+        tmp = mp3.with_suffix(f".{uuid.uuid4().hex}.tmp.mp3")
+        cmd = [
+            shutil.which("ffmpeg") or "ffmpeg",
+            "-nostdin", "-loglevel", "error", "-y",
+            "-i", str(wav), "-q:a", "2", "-f", "mp3", str(tmp),
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        if proc.returncode != 0:
+            tmp.unlink(missing_ok=True)
+            raise HTTPException(500, "mp3 transcode failed")
+        os.replace(tmp, mp3)
+    return FileResponse(
+        str(mp3),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
+@app.get("/api/songs/{song_id}/stems/{stem_name}/waveform")
+def get_stem_waveform(
+    song_id: str, stem_name: str, buckets: int = Query(default=1500, ge=100, le=3000)
+):
+    """Per-stem waveform peaks, cached as waveform_{stem}.json."""
+    song_dir = DATA_DIR / song_id
+    cache = song_dir / f"waveform_{stem_name}.json"
+    if cache.exists():
+        return json.loads(cache.read_text())
+    wav = song_dir / f"{stem_name}.wav"
+    if not wav.exists():
+        raise HTTPException(404, f"No stem '{stem_name}'")
+    try:
+        peaks, rms = scan_stem(wav, buckets=buckets)
+    except Exception as e:
+        raise HTTPException(500, f"Waveform scan failed: {e}")
+    result = {"peaks": peaks, "rms": round(rms, 6)}
+    cache.write_text(json.dumps(result))
+    return result
+
+
+# ── Beats ─────────────────────────────────────────────────────────────────────
+
+def _beats_paths(song_id: str) -> tuple[Path, Path]:
+    stems_dir = DATA_DIR / song_id
+    return stems_dir / "beats.json", stems_dir / "beats.user.json"
+
+
+def _read_beat_grid(song_id: str) -> dict | None:
+    computed, user = _beats_paths(song_id)
+    if not computed.is_file():
+        return None
+    try:
+        grid = json.loads(computed.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if user.is_file():
+        try:
+            edits = json.loads(user.read_text())
+            if isinstance(edits.get("beats"), list) and edits["beats"]:
+                grid["beats"] = edits["beats"]
+                grid["bars"] = edits.get("bars") or []
+                grid["edited"] = True
+        except (OSError, json.JSONDecodeError):
+            pass
+    grid.setdefault("bars", [])
+    grid.setdefault("edited", False)
+    return grid
+
+
+@app.get("/api/songs/{song_id}/beats")
+def get_beats(song_id: str):
+    """Beat grid (prefers user edits over detected). Computed on-demand if missing."""
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    computed, _ = _beats_paths(song_id)
+    if not computed.is_file():
+        # On-demand detection
+        manifest_path = song_dir / "manifest.json"
+        if not manifest_path.exists():
+            raise HTTPException(404, f"No song '{song_id}'")
+        manifest = json.loads(manifest_path.read_text())
+        beat_stem = next(
+            (s for s in ["drums", "other", "bass", "vocals"] if s in manifest.get("stems", [])),
+            (manifest.get("stems") or [None])[0],
+        )
+        if not beat_stem:
+            raise HTTPException(422, "No stems for beat detection")
+        stem_path = song_dir / f"{beat_stem}.wav"
+        if not stem_path.exists():
+            raise HTTPException(404, f"Stem missing: {beat_stem}.wav")
+        try:
+            beats = detect_beats(str(stem_path))
+        except Exception as e:
+            raise HTTPException(500, f"Beat detection failed: {e}")
+        computed.write_text(json.dumps(beats))
+        _patch_manifest(song_dir, {
+            "has_beats":       True,
+            "bpm":             beats.get("bpm"),
+            "tempo_stability": beats.get("tempo_stability"),
+        })
+
+    grid = _read_beat_grid(song_id)
+    if grid is None:
+        raise HTTPException(404, "beat grid not found")
+    return Response(
+        content=json.dumps(grid),
+        media_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+class BeatsBody(BaseModel):
+    beats: list[float] = Field(max_length=20000)
+    bars: list[dict] = Field(default_factory=list, max_length=2000)
+
+
+@app.patch("/api/songs/{song_id}/beats")
+def update_beats(song_id: str, body: BeatsBody):
+    """Persist an edited beat grid to beats.user.json."""
+    if not (DATA_DIR / song_id).exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    computed, user = _beats_paths(song_id)
+    if not computed.is_file():
+        raise HTTPException(404, "beat grid not found — detect beats first")
+    payload = {
+        "version": 1,
+        "beats": [round(float(t), 6) for t in body.beats],
+        "bars": body.bars,
+    }
+    tmp = user.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload), encoding="utf-8")
+    tmp.replace(user)
+    return {"song_id": song_id, "beats": len(payload["beats"]), "edited": True}
+
+
+@app.delete("/api/songs/{song_id}/beats")
+def reset_beats(song_id: str):
+    """Discard user beat edits and revert to detected grid."""
+    if not (DATA_DIR / song_id).exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    _, user = _beats_paths(song_id)
+    user.unlink(missing_ok=True)
+    return {"song_id": song_id, "edited": False}
+
+
+# ── Key / LUFS ────────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/key")
+def get_key(song_id: str):
+    song_dir = DATA_DIR / song_id
+    key_path = song_dir / "key.json"
+    if key_path.exists():
+        return json.loads(key_path.read_text())
+    manifest_path = song_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    manifest = json.loads(manifest_path.read_text())
+    key_stem = next(
+        (s for s in ["other", "vocals", "bass"] if s in manifest.get("stems", [])),
+        (manifest.get("stems") or [None])[0],
+    )
+    if not key_stem:
+        raise HTTPException(422, "No stems for key detection")
+    stem_path = song_dir / f"{key_stem}.wav"
+    if not stem_path.exists():
+        raise HTTPException(404, f"Stem missing: {key_stem}.wav")
+    try:
+        key = detect_key(str(stem_path))
+    except Exception as e:
+        raise HTTPException(500, f"Key detection failed: {e}")
+    key_path.write_text(json.dumps(key))
+    _patch_manifest(song_dir, {
+        "has_key":        True,
+        "key":            key.get("key"),
+        "scale":          key.get("scale"),
+        "key_confidence": key.get("key_confidence"),
+        "lufs":           key.get("lufs"),
+        "peak_db":        key.get("peak_db"),
+        "dynamic_range":  key.get("dynamic_range"),
+    })
+    return key
+
+
+# ── Stem presence ─────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/stem_presence")
+async def get_stem_presence(song_id: str):
+    """
+    Return per-stem RMS presence percentages (0-100).
+    Computed on-demand from WAVs and cached in stem_presence.json.
+    Runs in a thread so the event loop stays unblocked.
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    try:
+        presence = await asyncio.to_thread(compute_stem_presence_from_wavs, song_dir)
+    except Exception as e:
+        raise HTTPException(500, f"Stem presence scan failed: {e}")
+    if not presence:
+        raise HTTPException(404, "No stem WAVs found for presence scan")
+    # Patch manifest so subsequent /api/songs loads have it pre-filled
+    _patch_manifest(song_dir, {"stem_presence": presence})
+    return presence
+
+
+# ── Bass solfège ───────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/solfa")
+def get_solfa(song_id: str):
+    """
+    Return cached tonic-solfa annotation for the bass stem.
+    Shape: { key, scale, events: [ {time, duration, pitch, midi, solfa, octave}, … ] }
+    404 when not yet computed — client should trigger POST /api/songs/{id}/solfa.
+    """
+    p = DATA_DIR / song_id / "solfa.json"
+    if not p.exists():
+        raise HTTPException(404, f"No solfa data for '{song_id}'")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+@app.post("/api/songs/{song_id}/solfa")
+async def compute_solfa(song_id: str):
+    """
+    Extract tonic-solfa syllables from the bass.wav stem using crepe/pyin
+    via note_extraction.py, map to solfège relative to the detected key,
+    write solfa.json and patch the manifest.
+    Runs in a thread; returns immediately with a status once done.
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    bass_wav = song_dir / "bass.wav"
+    if not bass_wav.exists():
+        raise HTTPException(422, "No bass stem found — run separation first")
+    key_path = song_dir / "key.json"
+    if not key_path.exists():
+        raise HTTPException(422, "Run key detection first (GET /api/songs/{id}/key)")
+
+    try:
+        solfa = await asyncio.to_thread(_extract_solfa, song_dir, bass_wav, key_path)
+    except Exception as e:
+        raise HTTPException(500, f"Solfa extraction failed: {e}")
+
+    out = song_dir / "solfa.json"
+    tmp = out.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(solfa, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(out)
+    _patch_manifest(song_dir, {"has_solfa": True})
+    return solfa
+
+
+def _extract_solfa(song_dir: Path, bass_wav: Path, key_path: Path) -> dict:
+    """
+    Pure-Python solfa extraction. Called from asyncio.to_thread.
+
+    Steps:
+      1. Load key.json to get root and scale.
+      2. Run pyin pitch detection on bass.wav via librosa.
+      3. Merge consecutive frames with the same MIDI note into sustained events.
+      4. Map each MIDI pitch to a tonic-solfa syllable relative to the key root.
+      5. Return structured dict compatible with the SolfaPanel frontend component.
+    """
+    import numpy as np
+    try:
+        import librosa
+    except ImportError:
+        raise RuntimeError("librosa is required for solfa extraction")
+
+    key_data   = json.loads(key_path.read_text(encoding="utf-8"))
+    root_name  = (key_data.get("key") or "C").split()[0]   # e.g. "G#"
+    scale_type = (key_data.get("scale") or "Major").lower()
+
+    # MIDI note number of the key root (C4 = 60 as reference, then mod 12)
+    ROOT_MIDI: dict[str, int] = {
+        "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
+        "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8,
+        "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11,
+    }
+    root_pc = ROOT_MIDI.get(root_name, 0)
+
+    # Scale semitone patterns (intervals from root)
+    SCALE_INTERVALS: dict[str, list[int]] = {
+        "major":          [0, 2, 4, 5, 7, 9, 11],
+        "natural minor":  [0, 2, 3, 5, 7, 8, 10],
+        "harmonic minor": [0, 2, 3, 5, 7, 8, 11],
+        "dorian":         [0, 2, 3, 5, 7, 9, 10],
+        "mixolydian":     [0, 2, 4, 5, 7, 9, 10],
+        "phrygian":       [0, 1, 3, 5, 7, 8, 10],
+        "lydian":         [0, 2, 4, 6, 7, 9, 11],
+    }
+    scale_key = next((k for k in SCALE_INTERVALS if k in scale_type), "major")
+    intervals  = SCALE_INTERVALS[scale_key]
+
+    # Solfège syllables (movable-do, major default; minor uses la-based)
+    MAJOR_SOLFA = ["Do", "Re", "Mi", "Fa", "Sol", "La", "Ti"]
+    MINOR_SOLFA = ["La", "Ti", "Do", "Re", "Mi", "Fa", "Sol"]
+    use_minor   = "minor" in scale_type or scale_type in ("dorian", "phrygian", "mixolydian")
+    SOLFA_NAMES = MINOR_SOLFA if use_minor else MAJOR_SOLFA
+
+    # Chromatic passing tones (#/b)
+    CHROMATIC_NAMES = [
+        "Di", "Ri", "Fi", "Si", "Li",   # sharps of Do Re Fa Sol La
+        "Ra", "Me", "Se", "Le", "Te",   # flats  of Re Mi Sol La Ti
+    ]
+
+    def midi_to_solfa(midi: int) -> tuple[str, int]:
+        """Return (syllable, octave) for a MIDI pitch."""
+        pc     = midi % 12
+        octave = midi // 12 - 1
+        rel    = (pc - root_pc) % 12
+        if rel in intervals:
+            idx = intervals.index(rel)
+            return SOLFA_NAMES[idx], octave
+        # Chromatic passing tone: name after the scale degree below
+        below_idx = max(i for i, iv in enumerate(intervals) if iv < rel)
+        below_sol = SOLFA_NAMES[below_idx]
+        # Use a # suffix on the degree below
+        return f"{below_sol}#", octave
+
+    # ── pyin pitch detection ──────────────────────────────────────────────────
+    y, sr = librosa.load(str(bass_wav), sr=22050, mono=True)
+    f0, voiced_flag, _ = librosa.pyin(
+        y,
+        fmin=float(librosa.note_to_hz("C1")),
+        fmax=float(librosa.note_to_hz("C5")),
+        sr=sr,
+        frame_length=2048,
+        hop_length=512,
+    )
+    times = librosa.frames_to_time(
+        np.arange(len(f0)), sr=sr, hop_length=512
+    )
+
+    # ── merge consecutive voiced frames into note events ──────────────────────
+    events: list[dict] = []
+    i = 0
+    n = len(f0)
+    while i < n:
+        if not voiced_flag[i] or f0[i] is None or np.isnan(f0[i]):
+            i += 1
+            continue
+        midi_float = librosa.hz_to_midi(f0[i])
+        midi_note  = int(round(midi_float))
+        start_time = float(times[i])
+        j = i + 1
+        while (
+            j < n
+            and voiced_flag[j]
+            and f0[j] is not None
+            and not np.isnan(f0[j])
+            and abs(int(round(librosa.hz_to_midi(f0[j]))) - midi_note) <= 1
+        ):
+            j += 1
+        end_time  = float(times[min(j, n - 1)])
+        duration  = end_time - start_time
+        # Drop very short blips (< 60 ms)
+        if duration < 0.06:
+            i = j
+            continue
+        solfa_syl, octave = midi_to_solfa(midi_note)
+        pitch_name = librosa.midi_to_note(midi_note)
+        events.append({
+            "time":     round(start_time, 4),
+            "duration": round(duration,   4),
+            "pitch":    pitch_name,
+            "midi":     midi_note,
+            "solfa":    solfa_syl,
+            "octave":   octave,
+        })
+        i = j
+
+    return {
+        "key":    key_data.get("key", "C Major"),
+        "scale":  key_data.get("scale", "Major"),
+        "root":   root_name,
+        "events": events,
+    }
+
+
+# ── Lyrics ────────────────────────────────────────────────────────────────────
+
+class LyricsPatch(BaseModel):
+    words: list[dict]
+    segments: list[dict]
+
+
+@app.get("/api/songs/{song_id}/lyrics")
+def get_lyrics(song_id: str):
+    p = DATA_DIR / song_id / "lyrics.json"
+    if not p.exists():
+        raise HTTPException(404, f"No lyrics for '{song_id}'")
+    return json.loads(p.read_text())
+
+
+@app.patch("/api/songs/{song_id}/lyrics")
+def patch_lyrics(song_id: str, body: LyricsPatch):
+    p = DATA_DIR / song_id / "lyrics.json"
+    if not p.exists():
+        raise HTTPException(404, f"No lyrics for '{song_id}'")
+    data = json.loads(p.read_text())
+    data["words"] = body.words
+    data["segments"] = body.segments
+    tmp = p.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    tmp.replace(p)
+    return {"ok": True}
+
+
+# ── Chords ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/chords")
+def get_chords(song_id: str):
+    p = DATA_DIR / song_id / "chords.json"
+    if not p.exists():
+        raise HTTPException(404, f"No chords for '{song_id}'")
+    return json.loads(p.read_text())
+
+
+# ── Sections ──────────────────────────────────────────────────────────────────
+
+class SectionsPatch(BaseModel):
+    sections: list[dict]
+
+
+@app.get("/api/songs/{song_id}/sections")
+def get_sections(song_id: str):
+    p = DATA_DIR / song_id / "sections.json"
+    if not p.exists():
+        raise HTTPException(404, f"No sections for '{song_id}'")
+    return json.loads(p.read_text())
+
+
+@app.patch("/api/songs/{song_id}/sections")
+def patch_sections(song_id: str, body: SectionsPatch):
+    song_dir = DATA_DIR / song_id
+    if not (song_dir / "manifest.json").exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    try:
+        validated = validate_sections(body.sections)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    p = song_dir / "sections.json"
+    tmp = p.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(validated, ensure_ascii=False, indent=2))
+    tmp.replace(p)
+    manifest = json.loads((song_dir / "manifest.json").read_text())
+    manifest["has_sections"] = True
+    (song_dir / "manifest.json").write_text(json.dumps(manifest))
+    return {"song_id": song_id, "sections": validated}
+
+
+# ── Notes ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/notes/{stem_name}")
+def get_notes(song_id: str, stem_name: str):
+    p = DATA_DIR / song_id / f"notes_{stem_name}.json"
+    if not p.exists():
+        raise HTTPException(404, f"No notes for stem '{stem_name}'")
+    return json.loads(p.read_text())
+
+
+# ── SSE events ────────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/events")
+async def song_events(song_id: str):
+    """
+    Server-Sent Events stream of import job progress.
+    Clients subscribe while a local import is running.
+    """
+    job = next(
+        (j for j in import_jobs.values() if j.get("song_id") == song_id),
+        None,
+    )
+    if job is None:
+        raise HTTPException(404, f"No active import for '{song_id}'")
+
+    _claim_sse()
+
+    async def stream():
+        try:
+            last_state: str | None = None
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + _MAX_SSE_SECONDS
+            while loop.time() < deadline:
+                state = job.get("state", "queued")
+                msg = job.get("status_message", "")
+                snapshot = json.dumps({"state": state, "message": msg, "song_id": song_id})
+                if snapshot != last_state:
+                    yield f"data: {snapshot}\n\n"
+                    last_state = snapshot
+                    if state in ("done", "error", "cancelled"):
+                        return
+                await asyncio.sleep(0.25)
+        finally:
+            _release_sse()
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── Mixdown export ────────────────────────────────────────────────────────────
+
+_ENCODE_ARGS = {
+    "wav":  ["-c:a", "pcm_s16le"],
+    "mp3":  ["-q:a", "2"],
+    "flac": ["-c:a", "flac"],
+    "ogg":  ["-c:a", "libvorbis", "-q:a", "6"],
+}
+_MEDIA_TYPES = {
+    "wav": "audio/wav",
+    "mp3": "audio/mpeg",
+    "flac": "audio/flac",
+    "ogg": "audio/ogg",
+}
+
+
+@app.get("/api/songs/{song_id}/mixdown.{ext}")
+async def get_mixdown(
+    song_id: str,
+    ext: str,
+    stems: str = Query(...),
+    gains: str = Query(...),
+    start: float | None = Query(default=None, ge=0),
+    end: float | None = Query(default=None, gt=0),
+    click: bool = Query(default=False),
+    click_gain: float = Query(default=0.6, ge=0, le=4),
+):
+    """Render a mixdown of the given stems at the given gains."""
+    if ext not in _ENCODE_ARGS:
+        raise HTTPException(404, "not found")
+    if (start is None) != (end is None) or (start is not None and start >= end):
+        raise HTTPException(422, "start and end must both be present and start < end")
+
+    song_dir = DATA_DIR / song_id
+    if not (song_dir / "manifest.json").exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    name_list = [s for s in stems.split(",") if s]
+    gain_list = [float(g) for g in gains.split(",") if g]
+    if len(name_list) != len(gain_list):
+        raise HTTPException(422, "stems and gains must be equal length")
+
+    stem_paths = []
+    for name in name_list:
+        p = song_dir / f"{name}.wav"
+        if not p.exists():
+            raise HTTPException(404, f"Stem '{name}' not found")
+        stem_paths.append(p)
+
+    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    pre_seek = ["-ss", str(start)] if start is not None else []
+    post_t = ["-t", str(end - start)] if start is not None else []
+
+    cmd = [ffmpeg, "-nostdin", "-loglevel", "error"]
+    for p in stem_paths:
+        cmd += [*pre_seek, "-i", str(p)]
+
+    if click:
+        beats_data = _read_beat_grid(song_id)
+        if beats_data and beats_data.get("beats"):
+            from audio.click_render import render_click_wav, ACCENT_AUTO
+            click_path = CACHE_DIR / f"{song_id}_click.wav"
+            if not click_path.exists():
+                render_click_wav(
+                    click_path,
+                    beats_data["beats"],
+                    beats_data.get("bars", []),
+                    beats_data.get("duration", 0.0),
+                    accent_mode=ACCENT_AUTO,
+                )
+            if click_path.exists():
+                cmd += [*pre_seek, "-i", str(click_path)]
+                name_list.append("__click__")
+                gain_list.append(click_gain)
+
+    n = len(name_list)
+    filters = []
+    for i, gain in enumerate(gain_list):
+        filters.append(f"[{i}:a]volume={gain:.6f}[a{i}]")
+    if n > 1:
+        labels = "".join(f"[a{i}]" for i in range(n))
+        filters.append(f"{labels}amix=inputs={n}:normalize=0[mix]")
+        out_label = "[mix]"
+    else:
+        out_label = "[a0]"
+
+    codec = _ENCODE_ARGS[ext]
+    cmd += ["-filter_complex", ";".join(filters), "-map", out_label, *post_t, *codec]
+
+    media_type = _MEDIA_TYPES[ext]
+    filename = f"{song_id}_mix.{ext}"
+
+    # WAV/FLAC/MP3 need seekable output — render to a temp file first
+    if ext in ("wav", "flac", "mp3"):
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=f".{ext}", dir=CACHE_DIR)
+        os.close(tmp_fd)
+        tmp_path = Path(tmp_name)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, "-y", str(tmp_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)
+            if proc.returncode != 0:
+                tmp_path.unlink(missing_ok=True)
+                raise HTTPException(500, "export failed")
+        except asyncio.TimeoutError:
+            tmp_path.unlink(missing_ok=True)
+            raise HTTPException(504, "export timed out")
+
+        async def cleanup():
+            tmp_path.unlink(missing_ok=True)
+
+        from starlette.background import BackgroundTask
+        return FileResponse(
+            str(tmp_path),
+            media_type=media_type,
+            filename=filename,
+            background=BackgroundTask(lambda: tmp_path.unlink(missing_ok=True)),
+        )
+
+    # OGG: stream directly
+    async def _stream():
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, "pipe:1",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        while True:
+            chunk = await proc.stdout.read(65536)
+            if not chunk:
+                break
+            yield chunk
+        await proc.wait()
+
+    return StreamingResponse(
+        _stream(),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ── Stems ZIP ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/stems/all.zip")
+async def get_stems_zip(
+    song_id: str,
+    fmt: str = Query(default="wav", alias="format"),
+    stems: str | None = Query(default=None),
+):
+    """Bundle all (or selected) stems as a ZIP, optionally transcoded."""
+    if fmt not in _ENCODE_ARGS:
+        raise HTTPException(422, "format must be wav, mp3, flac, or ogg")
+
+    song_dir = DATA_DIR / song_id
+    if not (song_dir / "manifest.json").exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    all_names = ["vocals", "drums", "bass", "guitar", "piano", "other", "lead_vocals", "backing_vocals"]
+    if stems:
+        wanted = [s for s in stems.split(",") if s in all_names]
+        if not wanted:
+            raise HTTPException(422, "unknown stem names")
+    else:
+        wanted = all_names
+
+    sources = [(n, song_dir / f"{n}.wav") for n in wanted if (song_dir / f"{n}.wav").is_file()]
+    if not sources:
+        raise HTTPException(404, "no stems found")
+
+    slug = song_id.replace(" ", "_")[:80]
+    filename = f"{slug}_stems.zip"
+
+    def _build_zip(dest: Path) -> None:
+        ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+        encode = _ENCODE_ARGS[fmt]
+        with zipfile.ZipFile(dest, "w", zipfile.ZIP_STORED) as zf:
+            if fmt == "wav":
+                for name, p in sources:
+                    zf.write(p, arcname=f"{slug}_{name}.wav")
+            else:
+                with tempfile.TemporaryDirectory() as td:
+                    for name, p in sources:
+                        out = os.path.join(td, f"{name}.{fmt}")
+                        cmd = [ffmpeg, "-nostdin", "-loglevel", "error",
+                               "-i", str(p), *encode, "-f", fmt, out]
+                        subprocess_result = __import__("subprocess").run(
+                            cmd, stdin=__import__("subprocess").DEVNULL,
+                            stdout=__import__("subprocess").DEVNULL,
+                            stderr=__import__("subprocess").PIPE,
+                            timeout=300,
+                        )
+                        if subprocess_result.returncode == 0:
+                            zf.write(out, arcname=f"{slug}_{name}.{fmt}")
+
+    tmp_fd, tmp_name = tempfile.mkstemp(suffix=".zip", dir=CACHE_DIR)
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_name)
+    try:
+        await asyncio.to_thread(_build_zip, tmp_path)
+    except Exception as e:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(500, f"zip build failed: {e}")
+
+    from starlette.background import BackgroundTask
+    return FileResponse(
+        str(tmp_path),
+        media_type="application/zip",
+        filename=filename,
+        background=BackgroundTask(lambda: tmp_path.unlink(missing_ok=True)),
+    )
+
+
+# ── Single stem export (pitch / time-stretch) ─────────────────────────────────
+
+class ExportBody(BaseModel):
+    pitch_semitones: float = 0.0
+    time_stretch: float = 1.0
+
+
+@app.post("/api/songs/{song_id}/stems/{stem_name}/export")
+def export_stem(song_id: str, stem_name: str, body: ExportBody):
+    p = DATA_DIR / song_id / f"{stem_name}.wav"
+    if not p.exists():
+        raise HTTPException(404, f"No stem '{stem_name}'")
+
+    wav_bytes = p.read_bytes()
+    if abs(body.pitch_semitones) > 0.01:
+        buf = BytesIO(wav_bytes)
+        out = BytesIO()
+        pitch_shift_wav(buf, out, semitones=body.pitch_semitones)
+        wav_bytes = out.getvalue()
+    if abs(body.time_stretch - 1.0) > 0.01:
+        buf = BytesIO(wav_bytes)
+        out = BytesIO()
+        time_stretch_wav(buf, out, rate=body.time_stretch)
+        wav_bytes = out.getvalue()
+
+    return Response(
+        content=wav_bytes,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": f'attachment; filename="{song_id}_{stem_name}_export.wav"'
+        },
+    )
+
+
+# ── Local import (slow Demucs path) ──────────────────────────────────────────
+
+def _run_import(job_id: str, input_path: Path, song_id: str, model_name: str):
+    def prog(msg: str):
+        import_jobs[job_id]["log"].append(msg)
+        import_jobs[job_id]["status_message"] = msg
+
+    try:
+        import_jobs[job_id]["state"] = "running"
+        run_separation(input_path, song_id, model_name=model_name, progress_callback=prog)
+
+        song_dir = DATA_DIR / song_id
+        manifest = json.loads((song_dir / "manifest.json").read_text())
+        stems = manifest.get("stems", [])
+
+        # Compute peaks + presence
+        prog("Computing waveform peaks…")
+        rms = compute_stem_peaks(song_dir, stems)
+        presence = compute_stem_presence(rms)
+        manifest["stem_presence"] = presence
+        (song_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        # BPM
+        prog("Detecting BPM…")
+        beat_stem = next((s for s in ["drums", "other", "bass", "vocals"] if s in stems), stems[0] if stems else None)
+        if beat_stem:
+            try:
+                beats = detect_beats(str(song_dir / f"{beat_stem}.wav"))
+                (song_dir / "beats.json").write_text(json.dumps(beats))
+                manifest["has_beats"] = True
+                manifest["bpm"] = beats.get("bpm")
+                manifest["tempo_stability"] = beats.get("tempo_stability")
+                prog(f"BPM: {beats['bpm']}")
+            except Exception as e:
+                prog(f"BPM detection failed (non-fatal): {e}")
+
+        # Key
+        prog("Detecting key…")
+        key_stem = next((s for s in ["other", "vocals", "bass"] if s in stems), stems[0] if stems else None)
+        if key_stem:
+            try:
+                key = detect_key(str(song_dir / f"{key_stem}.wav"))
+                (song_dir / "key.json").write_text(json.dumps(key))
+                manifest["has_key"] = True
+                manifest["key"] = key.get("key")
+                manifest["scale"] = key.get("scale")
+                manifest["lufs"] = key.get("lufs")
+                manifest["peak_db"] = key.get("peak_db")
+                manifest["dynamic_range"] = key.get("dynamic_range")
+                prog(f"Key: {key['key']}")
+            except Exception as e:
+                prog(f"Key detection failed (non-fatal): {e}")
+
+        (song_dir / "manifest.json").write_text(json.dumps(manifest))
+        import_jobs[job_id]["state"] = "done"
+        import_jobs[job_id]["song_id"] = song_id
+    except Exception as e:
+        import_jobs[job_id]["state"] = "error"
+        import_jobs[job_id]["error"] = classify_failure(str(e))
+    finally:
+        input_path.unlink(missing_ok=True)
+
+
+class ScanBody(BaseModel):
+    path: str
+    folder_name: str = "mwtn-outputs"
+
+
+@app.post("/api/scan")
+def scan_drive(body: ScanBody):
+    """
+    Scan a local Drive folder for Colab output ZIPs and ingest any new ones.
+    Returns a list of newly ingested song_ids.
+    """
+    scan_root = Path(body.path)
+    if not scan_root.exists():
+        raise HTTPException(404, f"Path not found: {scan_root}")
+
+    # Look for ZIPs in the given path and one level deep
+    candidates: list[Path] = []
+    candidates.extend(scan_root.glob("*.zip"))
+    candidates.extend(scan_root.glob("*/*.zip"))
+    candidates.extend(scan_root.glob(f"{body.folder_name}/*.zip"))
+
+    ingested: list[str] = []
+    errors:   list[str] = []
+
+    for zip_path in sorted(set(candidates)):
+        song_id_candidate = zip_path.stem.replace(" ", "_")
+        if (DATA_DIR / song_id_candidate).exists():
+            continue  # already imported
+        try:
+            result = ingest_zip(zip_path, DATA_DIR)
+            ingested.append(result.get("song_id", zip_path.stem))
+        except Exception as e:
+            errors.append(f"{zip_path.name}: {e}")
+
+    return {
+        "scanned": len(candidates),
+        "ingested": ingested,
+        "errors": errors,
+    }
+
+
+@app.post("/api/import")
+async def import_song(
+    file: UploadFile = File(...),
+    model: str = Query(default=DEFAULT_MODEL),
+):
+    if model not in SUPPORTED_MODELS:
+        raise HTTPException(400, f"Unknown model '{model}'")
+    job_id = str(uuid.uuid4())
+    song_id = Path(file.filename).stem.replace(" ", "_")
+    if (DATA_DIR / song_id).exists():
+        raise HTTPException(409, f"Song '{song_id}' already exists")
+    dest = IMPORT_TMP / f"{job_id}_{file.filename}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    import_jobs[job_id] = {"state": "queued", "song_id": song_id, "model": model, "log": [], "status_message": "Queued"}
+    threading.Thread(target=_run_import, args=(job_id, dest, song_id, model), daemon=True).start()
+    return {"job_id": job_id, "song_id": song_id}
+
+
+@app.get("/api/import/{job_id}/status")
+def import_status(job_id: str):
+    if job_id not in import_jobs:
+        raise HTTPException(404, f"No import job '{job_id}'")
+    return import_jobs[job_id]
+
+
+# ── Ingest (pre-processed zip) ────────────────────────────────────────────────
+
+class IngestBody(BaseModel):
+    zip_path: str
+
+
+@app.post("/api/ingest")
+def ingest_song(body: IngestBody):
+    p = Path(body.zip_path)
+    if not p.exists():
+        raise HTTPException(404, f"Zip not found: {p}")
+    try:
+        result = ingest_zip(p, DATA_DIR)
+    except Exception as e:
+        raise HTTPException(500, f"Ingest failed: {e}")
+    return result
+
+
+@app.post("/api/ingest/upload")
+async def ingest_upload(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".zip"):
+        raise HTTPException(400, "Only .zip files accepted")
+    tmp = IMPORT_TMP / f"upload_{file.filename}"
+    try:
+        with tmp.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
+        result = ingest_zip(tmp, DATA_DIR)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Ingest failed: {e}")
+    finally:
+        tmp.unlink(missing_ok=True)
+    return result
+
+
+# ── Static frontend ───────────────────────────────────────────────────────────
+
+if FRONTEND.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND), html=True), name="frontend")
+else:
+    @app.get("/")
+    def _no_frontend():
+        return {"message": "Frontend not found. Expected: frontend/static/index.html"}

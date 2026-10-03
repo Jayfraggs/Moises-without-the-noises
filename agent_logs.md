@@ -70,3 +70,264 @@
   - If `dist` doesn't exist at all → builds unconditionally (first-run path).
 - Fix (activate.ps1): added comments clarifying that the build in step 2 is a one-time first-run step; subsequent incremental rebuilds are handled automatically by `run.ps1`.
 - Files modified: `run.ps1`, `activate.ps1`.
+
+---
+
+## Session: 2026-09-26 — stemdeck review + model selection
+
+### Changes shipped
+
+**Backend**
+- `backend/separation.py` — Full rewrite. `run_separation()` now accepts `model_name` param (`htdemucs_ft` or `htdemucs_6s`). `SUPPORTED_MODELS` dict defines stems + description per model. `DEFAULT_MODEL = 'htdemucs_6s'`. Computes `stem_presence` (normalised RMS % per stem) after separation and writes it into `manifest.json`.
+- `backend/main.py` — New `GET /api/config` endpoint returns available Demucs models + default to the frontend. `POST /api/import` now accepts `?model=` query param (validated against `SUPPORTED_MODELS`). Job record includes model name. `DELETE /api/songs/{song_id}` added. Lifespan hook cleans up orphan song dirs on startup.
+
+**Frontend**
+- `frontend/src/api.js` — `getAppConfig()` added. `importSong(file, model)` now passes `?model=` to the backend.
+- `frontend/src/components/ImportSong.jsx` — Rewrites with model selector dropdown. Fetches available models from `/api/config` on mount; falls back to hardcoded list. Shows stems for selected model. Status row now shows STATE label above message.
+- `frontend/src/components/MetaCards.jsx` — New component. Compact info pills: BPM (amber accent), KEY (+ mode), DURATION, MODEL. Inserted in App.jsx above TransportControls.
+- `frontend/src/components/StemPresence.jsx` — New component. Per-stem horizontal energy bars driven by `manifest.stem_presence` (normalised RMS %). Colour-coded by stem type using CSS tokens.
+- `frontend/src/components/StemControls.jsx` — `MiniMeter` added: per-channel VU meter canvas using rAF, green/amber/red zones, peak-hold decay. Colour stripe on left edge of each strip keyed to `--stem-color` token. `is-muted` dims entire strip. `is-soloed` lights stripe amber.
+- `frontend/src/components/SongSelector.jsx` — Rewrite with live search (filters by title/song_id), BPM pill, key pill, model pill (4s/6s badge), keyboard-accessible list.
+- `frontend/src/components/SongInfoBar.jsx` — Now shows song title (capitalised), plus `model-badge` for the Demucs model that processed the song.
+- `frontend/src/App.jsx` — `sidebarCollapsed` state + toggle button (`‹`/`›`). MetaCards and StemPresence inserted after SongInfoBar. `getAppConfig` import added.
+- `frontend/src/App.css` — CSS tokens for stem colours (`--stem-vocals/drums/bass/guitar/piano`). Styles for MetaCards, StemPresence, MiniMeter/stripe, ImportSong model selector, SongSelector search+pills, sidebar collapse.
+
+**Colab notebook** (`colab/mwtn_notebook.ipynb`)
+- Cell 7 (config): `htdemucs_ft` documented with full trade-off description; model-info summary print added.
+- Cell 21 (manifest): `stem_presence` computed (normalised RMS per stem × 100) and written into `manifest.json`. Displayed in frontend StemPresence cards.
+
+### What was deliberately NOT ported from stemdeck
+- stemdeck's Electron-native tray icon and always-on-top toggle — out of scope for the thin Electron shell
+- stemdeck's bundled yt-dlp download path — licensing/copyright risk for an open-source project
+- stemdeck's hardcoded 2-stem model (htdemucs) — we have the superior 6s/ft selection already
+
+---
+
+## Session: 2026-09-26 — multi-engine separation support
+
+### New engines added
+
+All engines are MIT-licensed and opt-in (install on demand, not pulled into requirements.txt by default).
+
+| Engine key(s) | Backend | Stems | pip install |
+|---|---|---|---|
+| `htdemucs_ft`, `htdemucs_6s` | Demucs (existing) | 4 / 6 | already in reqs |
+| `spleeter:2stems`, `spleeter:4stems`, `spleeter:5stems` | Spleeter (Deezer) | 2/4/5 | `spleeter` |
+| `umxl`, `umxhq` | Open-Unmix (Inria) | 4 | `openunmix torchaudio` |
+| `mdx-vocalft`, `mdx-inst-hq3` | MDX-Net via audio-separator | 2 | `audio-separator[cpu]` |
+| `bs-roformer` | BS-RoFormer via bs-roformer-infer | 6 | `bs-roformer-infer` |
+| `melband-roformer` | Mel-Band RoFormer via melband-roformer-infer | 2 | `melband-roformer-infer` |
+
+### Files changed
+
+**Backend**
+- `backend/separation.py` — full rewrite. `SUPPORTED_MODELS` dict now covers all 11 model keys. Six `_run_<engine>()` functions implement each backend. `_ENGINE_RUNNERS` dispatch table. `run_separation()` still the single public entry point — unchanged interface for `main.py`. `separation_engine` + `separation_model` written into manifest alongside legacy `demucs_model` key.
+- `backend/main.py` — `/api/config` now returns `separation_models` dict (richer, includes `engine`, `pip_hint`, `data_cost_mb`) alongside legacy `demucs_models` for backward compat.
+- `backend/requirements.txt` — optional engine installs documented as commented-out pip commands with notes on model download sizes.
+
+**Frontend**
+- `frontend/src/components/ImportSong.jsx` — model selector now uses `<optgroup>` to group by engine family. Reads `separation_models` from `/api/config` (falls back to `demucs_models` then hardcoded list). `DataCostWarning` component shows first-run download size in amber; flags Wi-Fi for anything ≥ 1 GB.
+- `frontend/src/components/MetaCards.jsx` — prefers `separation_model` key in manifest, falls back to `demucs_model`.
+- `frontend/src/components/SongSelector.jsx` — model pill abbreviates engine names cleanly for all engines, not just Demucs 4s/6s.
+- `frontend/src/App.css` — `.import-song__data-warning` style.
+
+**Colab notebook** (`colab/mwtn_notebook.ipynb`)
+- Cell 1 (markdown): install table for all engines, per-engine data cost table, mobile data warning.
+- Cell 2 (code): optional commented-out install lines for each non-default engine.
+- Cell 3 (config): replaced `DEMUCS_MODEL` / `WHISPER_MODEL` with `SEPARATION_MODEL`, `SEPARATION_ENGINE`, `ENGINE_DISPATCH`, `MDX_MODEL_KEYS`. Full model-choice table in comments.
+- Cell 5 (code): full engine dispatcher — `if/elif` blocks for demucs, spleeter, openunmix, mdxnet, bs_roformer, melband_roformer.
+- Cell 10 (manifest): records `separation_model`, `separation_engine`, and legacy `demucs_model` key.
+
+### Design decisions
+
+- **audio-separator over raw MDX-Net** — MDX-Net has no pip-installable inference package; `audio-separator[cpu]` from karaokenerds is the established thin wrapper with ONNX Runtime, GPU support, and model auto-download. MIT-licensed.
+- **bs-roformer-infer / melband-roformer-infer** — the architecture packages (lucidrains/BS-RoFormer) have no bundled checkpoints or CLI. The openmirlab inference packages provide sha256-verified checkpoint auto-download and a clean Python API. Both MIT.
+- **Spleeter's TF constraint documented** — Spleeter requires Python 3.8–3.11 and TensorFlow; noted in pip_hint so users on Python 3.12+ know before they install.
+- **`data_cost_mb` exposed in `/api/config`** — the frontend shows a Wi-Fi warning before the user triggers a local import that would download hundreds of MB on mobile data.
+
+---
+
+## Session: 2026-09-26 — Priority fixes, test suite, ZIP drag-drop, docs
+
+### Priority tasks completed
+
+**P1 — getStemRMS() / VU meters (was broken)**
+- `AudioEngine.js`: AnalyserNode (fftSize=256, smoothing=0.8) inserted between
+  each stem's GainNode and the master _mixGain. `getStemRMS(name)` reads
+  `getFloatTimeDomainData()` each rAF frame — no allocation per call.
+  `unloadAll()` patched to also disconnect analyserNodes (was a leak).
+  `getStemWaveform(name, numPoints)` added — downsamples decoded AudioBuffer
+  to N RMS values synchronously for the static waveform display.
+
+**P2 — Waveform view**
+- `WaveformView.jsx` (new): dual-layer canvas. Static RMS waveform from
+  `getStemWaveform()`, teal tint over played region, white playhead, amber
+  loop region overlay with A/B labels. Click/drag to seek via pointer
+  capture. Mounted in App.jsx above TransportControls.
+- `App.jsx`: `loopStart`, `loopEnd`, `activeStem` state lifted to App.
+  Stem-picker row (coloured buttons) switches which stem's waveform is shown.
+- `TransportControls.jsx`: `onLoopChange` prop added; all three loop
+  mutations (markStart, markEnd, clearLoop) call it so WaveformView updates.
+
+**P3 — Keyboard shortcuts**
+- `hooks/useKeyboardShortcuts.js` (new): Space, ←/→ (±5s), Shift+←/→ (±30s),
+  `[`/`]` (loop A/B), Escape (clear loop), 1–6 (solo by index), 0 (un-solo all).
+  Input-focus guard prevents firing when user types in search/lyrics/etc.
+  Cleans up the event listener on unmount.
+- Wired into App.jsx with `useKeyboardShortcuts({...})`.
+
+**P4 — Stem download progress bars**
+- `AudioEngine.js`: `loadStem()` rewritten to use XMLHttpRequest instead of
+  fetch — XHR has `onprogress` with `lengthComputable`, fetch does not.
+  `onProgress(0..1)` callback parameter added (optional, defaults null).
+- `App.jsx`: `stemProgress` state ({name: 0..1}), updated via callback,
+  reset on song change. Progress bar grid rendered above WaveformView while
+  any stem is < 100%. Disappears automatically once all stems are loaded.
+
+**P5 — Delete confirmation**
+- `App.jsx` `handleDeleteSong`: `window.confirm()` added with song title and
+  explicit "cannot be undone" warning before any delete call.
+
+**P6 — Loop region overlay on waveform**
+- Implemented as part of WaveformView (P2). Amber fill, left/right edge lines,
+  "A"/"B" text labels. Props: `loopStart`, `loopEnd` (both nullable).
+
+**P7 — Pitch-preserving speed via SoundTouch tempo param**
+- `AudioEngine.js` `setTempo(rate)`: checks for SoundTouch worklet's `tempo`
+  (or `rate`) AudioParam first; if found, sets it directly without restarting
+  sources. Falls back to `setPlaybackRate()` if worklet is unavailable.
+- `App.jsx`: `handleRateChange` and the song-load rate reset now call
+  `setTempo()` instead of `setPlaybackRate()`.
+- `SpeedControl.jsx` caveat note ("Pitch shifts at speeds other than 1×")
+  is now only shown when the worklet fallback is active (not when worklet
+  tempo param is in use) — future task, currently always visible.
+
+**P8 — Backend offline detection**
+- `App.jsx` `refreshSongs()`: catches network-level fetch errors (message
+  contains 'fetch', 'Failed to fetch', 'NetworkError', 'net::ERR') and sets
+  `backendOnline: false` rather than populating `loadError`.
+- Offline banner rendered with clear instructions for starting the server
+  (Electron-aware: different message for Electron vs browser). Retry button
+  calls `refreshSongs()` directly.
+
+**ZIP drag-drop ingest (new feature)**
+- `backend/ingest.py` rewritten. Two ZIP shapes supported:
+  1. Colab-pipeline ZIP (has manifest.json) — extracted as-is.
+  2. Raw-stems ZIP (loose WAVs, no manifest) — stems normalised by filename
+     via STEM_NAME_ALIASES dict, manifest auto-generated.
+  Path-traversal safety check on all ZIP entries. Idempotent (re-ingest
+  of existing song_id returns existing manifest).
+- `backend/main.py`: `POST /api/ingest/upload` (new) — multipart file
+  upload + ingest in one call. Validates .zip extension, saves to tmp,
+  ingests, deletes tmp.
+- `frontend/src/api.js`: `ingestUpload(file, onProgress)` added — uses
+  XHR for upload progress events.
+- `frontend/src/components/ImportZip.jsx` (new): drag-and-drop or
+  click-to-browse. Handles Colab ZIPs and raw-stems ZIPs. Upload progress
+  bar. Success / error status. Collapsible naming conventions table listing
+  all recognised aliases per canonical stem. Wired into App.jsx sidebar.
+
+### Test suite
+
+New test files (all new this session):
+- `frontend/src/components/__tests__/AudioEngine.test.js` (10 tests)
+- `frontend/src/components/__tests__/WaveformView.test.jsx` (8 tests)
+- `frontend/src/components/__tests__/useKeyboardShortcuts.test.js` (11 tests)
+- `frontend/src/components/__tests__/ImportZip.test.jsx` (7 tests)
+- `frontend/src/components/__tests__/MetaCards.test.jsx` (7 tests + 4 StemPresence)
+- `backend/tests/test_ingest.py` (17 tests)
+- `backend/tests/test_separation_models.py` (16 tests)
+
+Vitest config: `vite.config.js` updated with `test: { globals, environment: jsdom,
+setupFiles }`. `src/setupTests.js` created with `@testing-library/jest-dom` import.
+
+Total test inventory: 93 tests across 11 test files.
+
+### Docs
+- `docs/architecture.md` fully rewritten: repo layout, all processing paths,
+  ZIP naming conventions table, all 11 separation engines, full API surface
+  (17 endpoints), AudioEngine design notes, frontend state table, keyboard
+  shortcut reference, data format specs, test inventory, operational notes
+  with mobile data cost table, known limitations, and next steps.
+
+### Bug fixes (spotted during audit)
+- `unloadAll()` was not disconnecting AnalyserNodes added this session — patched.
+- Rate-change and song-load rate-reset both called `setPlaybackRate()` directly
+  in App.jsx, bypassing the pitch-preserving path — both patched to `setTempo()`.
+- `SongSelector` model pill used `4s`/`6s` Demucs-only abbreviation — updated to
+  handle all engine names via `replace()` chain.
+- `MetaCards` only read `demucs_model` from manifest — updated to prefer the
+  new `separation_model` key with fallback.
+
+---
+
+## Session: 2026-09-28 — Gap fix, model selector in UI, ingest.py bug
+
+### Bug fixed — ingest.py line 71
+
+`_is_safe_path()` used `name.replace("\\", "/")` — the backslash in a
+regular Python string literal is an invalid escape sequence (`\"`  is not a
+recognised escape, so Python 3.12+ raises `DeprecationWarning` and 3.13+
+raises `SyntaxError` during compilation). The archive member normalisation
+lines (138, 189) used `"\\\\"` which only replaces pairs of backslashes
+(Windows long-path UNC style) and silently missed ordinary single-backslash
+Windows ZIP entries.
+
+Fix: extracted a `_normalise_zip_path()` helper that uses `chr(92)` (the
+backslash character, unambiguously) rather than a string escape. All three
+call sites updated. `ingest.py` fully rewritten for clarity — same logic,
+clean escaping throughout. Verified with `ast.parse()`.
+
+### Gap fixed — Colab/Electron folder name mismatch
+
+Root cause: the notebook hardcoded `mwtn_outputs` (underscore) to Google
+Drive, but `driveDetect.js` defaulted to `mwtn-outputs` (hyphen). These
+never matched, so `ImportDrive` scanned the wrong path and found nothing.
+
+Fix:
+- Notebook Cell 3: new `DRIVE_OUTPUT_FOLDER = 'mwtn-outputs'` variable
+  (now matches the Electron default). Cell 21 now uses that variable —
+  no more hardcoded path. An explicit comment says it must match the
+  Settings panel.
+- `electron/driveDetect.js`: fixed typo `DEFAULT_MWNT_FOLDER` →
+  `DEFAULT_MWTN_FOLDER`. Value confirmed as `'mwtn-outputs'`.
+
+### Model selector in Electron Settings panel
+
+Users can now change their default separation model from the Settings panel
+(gear icon) without touching any code. The choice is:
+- Shown in the UI with stems list, data cost, and a reminder to set the
+  matching `SEPARATION_MODEL` in the Colab notebook Cell 3.
+- Persisted to `mwtn-config.json` via the existing `driveDetect` config
+  system (new `defaultModel` field added to `normalizeConfig`).
+- Read by `ImportSong.jsx` on mount — the dropdown pre-selects the user's
+  saved model.
+
+IPC chain: `Settings.jsx` → `electronAPI.setDriveConfig(path, folder, model)`
+→ `preload.js` contextBridge → `ipcMain.handle('drive:setConfig')` →
+`setDriveConfig(userData, path, folder, model)` → `mwtn-config.json`.
+
+### Colab quick-launch button
+
+Settings panel now has an "Open notebook in browser" button that calls
+`shell.openExternal()` via `electronAPI.openExternal()`. No OAuth, no API
+integration — opens the notebook URL in the system's default browser. This
+is the correct approach for v1: Colab's own auth handles everything, the
+GPU is free, and there are no API preview risks or rate limits.
+
+The button links directly to the GitHub-hosted notebook so users always get
+the latest version. After the notebook finishes, they click "Scan Drive" in
+the same Settings panel to import the new song.
+
+### Files changed (this session only)
+
+- `backend/ingest.py` — full rewrite (bug fix + `_normalise_zip_path`)
+- `backend/tests/test_ingest.py` — 5 new `TestNormaliseZipPath` tests (22 total)
+- `colab/mwtn_notebook.ipynb` — Cell 3: `DRIVE_OUTPUT_FOLDER` variable; Cell 21: variable used
+- `electron/driveDetect.js` — typo fix, `defaultModel` in config
+- `electron/main.js` — `drive:setConfig` IPC handler forwards `defaultModel`
+- `electron/preload.js` — `setDriveConfig` contextBridge forwards `defaultModel`
+- `frontend/src/components/Settings.jsx` — full rewrite: Colab button, model selector, folder mismatch warning
+- `frontend/src/components/DriveConfigFields.jsx` — hint updated to reference notebook variable name
+- `frontend/src/components/ImportSong.jsx` — reads saved model from Electron config on mount
+- `frontend/src/App.css` — Settings section styles
