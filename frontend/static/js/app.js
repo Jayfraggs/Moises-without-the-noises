@@ -9,20 +9,23 @@
  *   catalog.js   — library list rendering + song selection
  *   studio.js    — waveform + mixer setup after a song loads
  *   transport.js — play/pause/seek/loop/speed/pitch controls
- *   import.js    — file drop, ZIP upload, ingest polling
- *   extract.js   — extract configuration modal (model + stem selection)
+ *   import.js    — file drop, ZIP upload, ingest polling, local separation
+ *   extract.js   — extraction settings modal (model + stem selection)
  *   settings.js  — settings dialog + drive scan
+ *   solfa.js     — bass solfège panel with playback sync
+ *   lyrics.js    — synced lyrics panel with playback sync
  */
 
-import { State }    from './state.js';
-import { API }      from './api.js';
-import { Catalog }  from './catalog.js';
-import { Studio }   from './studio.js';
-import { Transport } from './transport.js';
-import { Import }   from './import.js';
-import { Extract }  from './extract.js';
-import { Settings }   from './settings.js';
-import { SolfaPanel } from './solfa.js';
+import { State }       from './state.js';
+import { API }         from './api.js';
+import { Catalog }     from './catalog.js';
+import { Studio }      from './studio.js';
+import { Transport }   from './transport.js';
+import { Import }      from './import.js';
+import { Extract }     from './extract.js';
+import { Settings }    from './settings.js';
+import { SolfaPanel }  from './solfa.js';
+import { LyricsPanel } from './lyrics.js';
 
 // ── Globals accessible in DevTools ───────────────────────────────────────────
 window._mwtn = { State, API };
@@ -32,34 +35,45 @@ async function boot() {
   console.log('[mwtn] booting…');
 
   // Wire all modules
-  const catalog    = new Catalog({ State, API, Studio });
-  const studio     = new Studio({ State, API });
-  const transport  = new Transport({ State, studio });
-  const importer   = new Import({ State, API, catalog });
-  const extract    = new Extract({ API });
-  const settings   = new Settings({ State, API, catalog });
-  const solfaPanel = new SolfaPanel({ API });
+  const catalog      = new Catalog({ State, API, Studio });
+  const studio       = new Studio({ State, API });
+  const transport    = new Transport({ State, studio });
+  const importer     = new Import({ State, API, catalog });
+  const extract      = new Extract({ API });
+  const settings     = new Settings({ State, API, catalog });
+  const solfaPanel   = new SolfaPanel({ API });
+  const lyricsPanel  = new LyricsPanel({ API });
 
   // Make studio reachable from catalog
   catalog.studio = studio;
 
-  // Hook SolfaPanel into Studio's rAF loop
-  studio._onTick = (pos) => solfaPanel.tick(pos);
+  // Hook both panels into Studio's rAF loop
+  studio._onTick = (pos) => {
+    solfaPanel.tick(pos);
+    lyricsPanel.tick(pos);
+  };
 
-  // Hook SolfaPanel load alongside studio loadSong
+  // Hook panel loads alongside studio loadSong
   const _origLoad = studio.loadSong.bind(studio);
   studio.loadSong = async (songId) => {
     solfaPanel.clear();
+    lyricsPanel.clear();
     await _origLoad(songId);
-    // Only load solfa if the song has a bass stem
     const manifest = State.manifest;
     if (manifest?.stems?.includes('bass')) {
       solfaPanel.loadSong(songId);
     }
+    // Load lyrics unconditionally — panel handles 404 gracefully
+    lyricsPanel.loadSong(songId);
   };
 
   // Allow solfège cells to seek the player
   document.addEventListener('solfa:seek', (e) => {
+    studio.seek(e.detail.time);
+  });
+
+  // Allow lyrics words to seek the player
+  document.addEventListener('lyrics:seek', (e) => {
     studio.seek(e.detail.time);
   });
 
@@ -71,6 +85,17 @@ async function boot() {
     solfaCollapseBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
     if (solfaBody) solfaBody.style.display = expanded ? 'none' : '';
     const chevron = solfaCollapseBtn.querySelector('svg polyline');
+    if (chevron) chevron.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
+  });
+
+  // Lyrics panel collapse toggle
+  const lyricsCollapseBtn = document.getElementById('lyricsCollapseBtn');
+  const lyricsBody        = document.getElementById('lyricsBody');
+  lyricsCollapseBtn?.addEventListener('click', () => {
+    const expanded = lyricsCollapseBtn.getAttribute('aria-expanded') === 'true';
+    lyricsCollapseBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    if (lyricsBody) lyricsBody.style.display = expanded ? 'none' : '';
+    const chevron = lyricsCollapseBtn.querySelector('svg polyline');
     if (chevron) chevron.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
   });
 

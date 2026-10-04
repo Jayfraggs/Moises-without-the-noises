@@ -316,6 +316,23 @@
               <span class="uplabel daw-label-sub">Drag fader · M/S</span>
             </div>
             <div class="daw-ruler-area">
+              <!-- Beat grid toolbar -->
+              <div class="beat-grid-toolbar hidden" id="beatGridToolbar">
+                <span class="beat-grid-badge">Beat Editor</span>
+                <span class="beat-grid-info" id="beatGridInfo">— beats</span>
+                <button class="beat-tool-btn" id="beatEditToggleBtn" type="button" title="Toggle edit mode">Edit</button>
+                <button class="beat-tool-btn" id="beatSaveBtn"       type="button" title="Save edits" disabled>Save</button>
+                <button class="beat-tool-btn" id="beatResetBtn"      type="button" title="Reset to detected">Reset</button>
+                <span class="beat-save-badge" id="beatSaveBadge"></span>
+              </div>
+              <!-- VU toggle -->
+              <button class="vu-toggle-btn" id="vuToggleBtn" type="button" aria-pressed="false" title="Toggle VU meters">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="4" y1="9" x2="4" y2="15"/><line x1="9" y1="5" x2="9" y2="19"/>
+                  <line x1="14" y1="8" x2="14" y2="16"/><line x1="19" y1="4" x2="19" y2="20"/>
+                </svg>
+                Meters
+              </button>
               <div class="lanes-ruler" data-position="top">
                 <div class="lanes-ruler-time" id="ruler-time">
                   <div class="playhead-marker" aria-hidden="true">
@@ -370,6 +387,30 @@
             </div>
 
           </div><!-- /.daw-content -->
+
+          <!-- ══ VU METER PANEL ══ -->
+          <div id="vuMeterPanel" class="vu-meter-panel hidden" aria-label="VU Meters">
+            <div class="vu-meter-panel-header">
+              <span class="vu-panel-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="4" y1="9" x2="4" y2="15"/><line x1="9" y1="5" x2="9" y2="19"/>
+                  <line x1="14" y1="8" x2="14" y2="16"/><line x1="19" y1="4" x2="19" y2="20"/>
+                </svg>
+                VU Meters
+              </span>
+              <div class="vu-legend">
+                <span class="vu-legend-seg" style="background:#22c55e">Normal</span>
+                <span class="vu-legend-seg" style="background:#f4b740">Warn</span>
+                <span class="vu-legend-seg" style="background:#ff2d2d">Clip</span>
+              </div>
+              <button class="vu-collapse-btn" id="vuMeterCollapseBtn" type="button" aria-expanded="true" title="Collapse">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
+            <div class="vu-meter-body" id="vuMeterBody">
+              <!-- Populated by vu-meters.js -->
+            </div>
+          </div>
 
           <!-- ══ BASS SOLFÈGE PANEL ══ -->
           <section id="solfaPanel" class="solfa-panel" aria-label="Bass solfège">
@@ -570,6 +611,10 @@
                       <input type="checkbox" id="t-export-click">
                       <span>Include click track</span>
                     </label>
+                    <label class="export-click-opt" id="t-export-loop-wrap" title="Export only the loop region">
+                      <input type="checkbox" id="t-export-loop-only">
+                      <span>Loop region only</span>
+                    </label>
                     <button class="chip-panel-item export-item" id="t-export-mix" type="button" role="menuitem">
                       <span class="chip-item-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><line x1="4" y1="9" x2="4" y2="15"/><line x1="9" y1="5" x2="9" y2="19"/><line x1="14" y1="8" x2="14" y2="16"/><line x1="19" y1="4" x2="19" y2="20"/></svg></span>
                       <span class="chip-item-text"><span class="chip-item-title">Export Mix</span><span class="chip-item-desc">Mixed audio</span></span>
@@ -578,6 +623,11 @@
                       <span class="chip-item-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polygon points="12 2 22 8.5 12 15 2 8.5 12 2"/><polyline points="2 15.5 12 22 22 15.5"/></svg></span>
                       <span class="chip-item-text"><span class="chip-item-title">Export All Stems</span><span class="chip-item-desc">All stems as .zip</span></span>
                     </button>
+                    <!-- Per-stem export rows — populated by app.js -->
+                    <div class="export-per-stem-section" id="export-per-stem-section">
+                      <div class="export-per-stem-label">Per stem</div>
+                      <div id="export-per-stem-list"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -589,8 +639,9 @@
                   <div class="footer-wave-ticks" id="footer-wave-ticks" aria-hidden="true"></div>
                   <div class="footer-wave-bar">
                     <canvas id="footer-waveform" aria-hidden="true"></canvas>
-                    <div class="footer-scrub" id="footer-scrub" role="slider" aria-label="Seek" tabindex="0">
+                    <div class="footer-scrub" id="footer-scrub" role="slider" aria-label="Seek" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                       <div class="footer-scrub-fill" id="footer-scrub-fill"></div>
+                      <div class="scrub-tooltip" id="scrub-tooltip" aria-hidden="true"></div>
                     </div>
                   </div>
                 </div>

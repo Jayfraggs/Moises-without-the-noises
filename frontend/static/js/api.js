@@ -131,7 +131,7 @@ export const API = {
   // ── Import ─────────────────────────────────────────────────────────────────
 
   /**
-   * Upload a ZIP and ingest it. Returns the manifest.
+   * Upload a ZIP (Colab output) and ingest it. Returns the manifest.
    * onProgress(0..1) called with upload progress.
    */
   ingestUpload(file, onProgress = null) {
@@ -160,6 +160,45 @@ export const API = {
     });
   },
 
+  /**
+   * Upload an audio file for local background separation.
+   * Returns { job_id, song_id }.
+   * onProgress(0..1) called with upload progress.
+   */
+  localImport(file, model = 'htdemucs_6s', onProgress = null) {
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}/import?model=${encodeURIComponent(model)}`);
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(e.loaded / e.total);
+        };
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('Invalid JSON from server')); }
+        } else {
+          let detail = xhr.statusText;
+          try { detail = JSON.parse(xhr.responseText).detail || detail; } catch {}
+          reject(new Error(`${xhr.status}: ${detail}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error uploading audio file'));
+      xhr.send(form);
+    });
+  },
+
+  /**
+   * Poll a local import job.
+   * Returns { state, status_message, song_id, error, log }
+   */
+  async importJobStatus(jobId) {
+    return _json(await fetch(`${BASE}/import/${encodeURIComponent(jobId)}/status`));
+  },
+
   // ── Export ─────────────────────────────────────────────────────────────────
 
   mixdownUrl(songId, { stems, gains, ext = 'wav', click = false, clickGain = 0.6 } = {}) {
@@ -184,5 +223,31 @@ export const API = {
     document.body.appendChild(a);
     a.click();
     a.remove();
+  },
+
+  // ── Setup ──────────────────────────────────────────────────────────────────
+
+  async setupCheck() {
+    return _json(await fetch(`${BASE}/setup/check`));
+  },
+
+  async setupSave(settings) {
+    return _json(await fetch(`${BASE}/setup/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    }));
+  },
+
+  async setupInstall(engine) {
+    return _json(await fetch(`${BASE}/setup/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine }),
+    }));
+  },
+
+  async setupInstallStatus(jobId) {
+    return _json(await fetch(`${BASE}/setup/install/${encodeURIComponent(jobId)}/status`));
   },
 };

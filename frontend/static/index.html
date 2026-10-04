@@ -422,6 +422,48 @@
             </div><!-- /.solfa-panel-body -->
           </section><!-- /#solfaPanel -->
 
+          <!-- ══ LYRICS PANEL ══ -->
+          <section id="lyricsPanel" class="lyrics-panel" aria-label="Synced lyrics">
+
+            <!-- Panel header -->
+            <div class="lyrics-panel-header">
+              <div class="lyrics-panel-title">
+                <!-- Lyrics icon -->
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Lyrics
+              </div>
+              <!-- Language badge -->
+              <span id="lyricsLangBadge" class="lyrics-lang-badge" style="display:none"></span>
+              <!-- NOW word display -->
+              <span id="lyricsNow" class="lyrics-now-pill" style="display:none" aria-live="polite" aria-atomic="true"></span>
+              <!-- Collapse toggle -->
+              <button class="lyrics-collapse-btn" id="lyricsCollapseBtn" type="button" aria-expanded="true" aria-controls="lyricsBody" title="Collapse">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
+
+            <!-- Panel body -->
+            <div class="lyrics-panel-body" id="lyricsBody">
+
+              <!-- Loading / empty states -->
+              <div id="lyricsEmpty" class="lyrics-empty" style="display:none">
+                <p id="lyricsPhrase" class="lyrics-phrase"></p>
+              </div>
+
+              <!-- Spinner -->
+              <div id="lyricsSpinner" class="lyrics-spinner" style="display:none" role="status" aria-label="Loading lyrics…">
+                <span class="lyrics-spin-ring"></span>
+                <span class="lyrics-phrase">Loading lyrics…</span>
+              </div>
+
+              <!-- Word grid — JS populates -->
+              <div id="lyricsGrid" class="lyrics-grid" role="list" aria-label="Lyrics words"></div>
+
+            </div><!-- /.lyrics-panel-body -->
+          </section><!-- /#lyricsPanel -->
+
         </div><!-- /#lanes -->
 
         <!-- ══ FOOTER ══ -->
@@ -616,7 +658,7 @@
           Extraction Settings
         </h2>
         <p style="margin:0 0 18px;font-size:11px;color:var(--muted);line-height:1.5">
-          Configure these options, then copy them into <strong>Cell 3</strong> of the Colab notebook before running.
+          Choose a model and stems, then either copy the settings for Colab or run separation locally.
         </p>
 
         <!-- Model selector -->
@@ -661,25 +703,46 @@
           </label>
         </div>
 
-        <!-- Copy button -->
-        <button id="extractCopyBtn" style="
-          width:100%;padding:10px;border-radius:8px;
-          border:1px solid rgba(244,183,64,0.35);
-          background:rgba(244,183,64,0.14);
-          color:var(--accent);font-family:var(--font-mono);
-          font-size:13px;font-weight:700;cursor:pointer;
-          display:flex;align-items:center;justify-content:center;gap:7px;
-          transition:background 0.12s
-        ">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-          </svg>
-          Copy Colab Settings
-        </button>
+        <!-- Action buttons -->
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <!-- Run locally -->
+          <button id="extractRunLocalBtn" style="
+            width:100%;padding:10px;border-radius:8px;
+            border:1px solid rgba(34,197,94,0.35);
+            background:rgba(34,197,94,0.10);
+            color:#4ade80;font-family:var(--font-mono);
+            font-size:13px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:7px;
+            transition:background 0.12s
+          ">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Run Locally — pick audio file
+          </button>
+          <p style="margin:0;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
+            Runs Demucs (or selected engine) on your machine. Requires the engine to be installed. Slow on CPU.
+          </p>
 
-        <p style="margin:10px 0 0;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          Paste into <code style="font-family:var(--font-mono);font-size:10px">Cell 3</code> of the Colab notebook, then run all cells.
-        </p>
+          <!-- Copy for Colab -->
+          <button id="extractCopyBtn" style="
+            width:100%;padding:10px;border-radius:8px;
+            border:1px solid rgba(244,183,64,0.35);
+            background:rgba(244,183,64,0.14);
+            color:var(--accent);font-family:var(--font-mono);
+            font-size:13px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:7px;
+            transition:background 0.12s
+          ">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy Colab Settings
+          </button>
+          <p style="margin:0;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
+            Paste into <code style="font-family:var(--font-mono);font-size:10px">Cell 3</code> of the Colab notebook, then run all cells.
+          </p>
+        </div>
       </div>
     </div>
 

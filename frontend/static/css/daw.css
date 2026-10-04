@@ -5279,3 +5279,209 @@ input, textarea { font-family: inherit; }
   animation: daw-spin 0.85s linear infinite;
   flex-shrink: 0;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LYRICS PANEL
+   Mirrors the solfa panel's layout. Horizontal scroll of word pills that
+   highlight and track along with playback.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.lyrics-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header bar */
+.lyrics-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 36px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--panel);
+}
+
+.lyrics-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Language badge */
+.lyrics-lang-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--fg-2);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 1px 7px;
+  line-height: 1.6;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.lyrics-lang-badge:empty { display: none; }
+
+/* NOW playing pill */
+.lyrics-now-pill {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  letter-spacing: 0.04em;
+  min-width: 80px;
+  text-align: center;
+  color: var(--fg);
+  transition: color 0.1s;
+}
+
+/* Collapse toggle */
+.lyrics-collapse-btn {
+  margin-left: auto;
+  width: 22px; height: 22px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.lyrics-collapse-btn:hover { background: var(--panel-2); color: var(--fg); }
+
+/* Body */
+.lyrics-panel-body {
+  display: flex;
+  align-items: flex-start;
+  min-height: 54px;
+  max-height: 110px;
+  overflow: hidden;
+  position: relative;
+  padding: 8px 0;
+}
+
+/* Scrollable word grid */
+.lyrics-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.lyrics-grid::-webkit-scrollbar { height: 4px; }
+.lyrics-grid::-webkit-scrollbar-track { background: transparent; }
+.lyrics-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Individual word pill */
+.lyrics-word {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 9px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--fg-2);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.08s, border-color 0.08s, color 0.08s, transform 0.08s;
+  user-select: none;
+  white-space: nowrap;
+}
+/* Coloured bottom accent bar (lyrics use bottom — visually distinct from solfa) */
+.lyrics-word::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 0 0 6px 6px;
+  opacity: 0;
+  transition: opacity 0.08s, height 0.08s;
+}
+.lyrics-word:hover {
+  background: var(--panel-2);
+  border-color: var(--border-strong);
+  color: var(--fg);
+  transform: translateY(-1px);
+}
+.lyrics-word.active {
+  background: rgba(244, 183, 64, 0.12);
+  border-color: rgba(244, 183, 64, 0.45);
+  color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+}
+.lyrics-word.active::after { opacity: 1; height: 3px; }
+
+/* Line-break hint between sentences */
+.lyrics-break {
+  display: inline-block;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+/* Empty / loading states */
+.lyrics-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+}
+.lyrics-phrase {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+}
+
+/* Spinner */
+.lyrics-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+}
+.lyrics-spin-ring {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: daw-spin 0.85s linear infinite;
+  flex-shrink: 0;
+}

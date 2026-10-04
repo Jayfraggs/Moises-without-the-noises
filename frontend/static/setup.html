@@ -4,50 +4,38 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>mwtn — Setup</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/css/variables.css"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5}
+    html,body{height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,system-ui,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
     button{cursor:pointer;border:none;background:none;color:inherit;font:inherit}
     input,select,textarea{font:inherit;color:inherit;outline:none}
     a{color:var(--accent)}
     .hidden{display:none!important}
-    code{font-family:'JetBrains Mono',monospace;font-size:0.85em;background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
-    pre{font-family:'JetBrains Mono',monospace;font-size:12.5px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;line-height:1.6}
+    code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:0.85em;background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+    pre{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;line-height:1.6}
 
-    /* ── Shell ── */
     .wizard{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 16px}
-    .wizard-card{width:100%;max-width:660px;background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+    .wizard-card{width:100%;max-width:680px;background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5)}
 
-    /* ── Header ── */
     .wiz-header{padding:24px 28px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px}
     .wiz-logo{width:44px;height:44px;flex-shrink:0}
     .wiz-header-text h1{font-size:18px;font-weight:700;color:var(--fg)}
     .wiz-header-text p{font-size:12.5px;color:var(--muted);margin-top:2px}
 
-    /* ── Progress bar ── */
     .wiz-progress{height:3px;background:var(--border);position:relative}
     .wiz-progress-fill{height:100%;background:var(--accent);transition:width .35s ease}
 
-    /* ── Steps nav ── */
-    .wiz-steps{display:flex;border-bottom:1px solid var(--border);padding:0 28px}
+    .wiz-steps{display:flex;border-bottom:1px solid var(--border);padding:0 28px;overflow-x:auto}
     .wiz-step-tab{padding:12px 0;margin-right:24px;font-size:12.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:default;transition:color .15s,border-color .15s;white-space:nowrap}
     .wiz-step-tab.active{color:var(--accent);border-color:var(--accent)}
     .wiz-step-tab.done{color:var(--fg-2)}
 
-    /* ── Body ── */
     .wiz-body{padding:28px}
-
-    .step{display:none}
-    .step.active{display:block}
-
+    .step{display:none}.step.active{display:block}
     .step h2{font-size:16px;font-weight:700;margin-bottom:6px}
     .step .step-desc{font-size:13px;color:var(--fg-2);margin-bottom:20px;line-height:1.55}
 
-    /* ── Path choice ── */
     .path-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
     .path-card{border:2px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
     .path-card:hover{border-color:var(--border-strong);background:var(--panel-2)}
@@ -60,7 +48,6 @@
     .badge-recommended{background:rgba(244,183,64,.15);color:var(--accent);border:1px solid rgba(244,183,64,.3)}
     .badge-slow{background:rgba(214,90,74,.12);color:#ff9090;border:1px solid rgba(214,90,74,.2)}
 
-    /* ── Field groups ── */
     .field-group{margin-bottom:16px}
     .field-label{font-size:12px;font-weight:600;color:var(--fg-2);margin-bottom:5px;display:block}
     .field-input{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border-strong);border-radius:7px;color:var(--fg);font-size:13px;transition:border-color .12s}
@@ -68,29 +55,44 @@
     .field-hint{font-size:11px;color:var(--muted);margin-top:4px}
     select.field-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%238a939c' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:32px}
 
-    /* ── Info box ── */
     .info-box{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:12.5px;color:var(--fg-2);line-height:1.55;margin-bottom:16px}
     .info-box strong{color:var(--fg)}
     .info-box.warn{border-color:rgba(244,183,64,.3);background:rgba(244,183,64,.06)}
     .info-box.warn strong{color:var(--accent)}
 
-    /* ── Checklist ── */
     .checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
     .checklist li{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--fg-2)}
-    .check-icon{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px}
+    .check-icon{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px;font-weight:700}
     .check-icon.ok{background:rgba(76,175,125,.15);color:#4caf7d;border:1px solid rgba(76,175,125,.3)}
     .check-icon.warn{background:rgba(244,183,64,.12);color:var(--accent);border:1px solid rgba(244,183,64,.2)}
     .check-icon.fail{background:rgba(214,90,74,.12);color:#ff9090;border:1px solid rgba(214,90,74,.2)}
-    .check-icon.spin{animation:spin 1s linear infinite}
+    .check-icon.idle{background:var(--panel-3);color:var(--muted);border:1px solid var(--border)}
+    .check-icon.spin{background:var(--panel-3);color:var(--accent);border:1px solid var(--border);animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* ── Status log ── */
-    .status-log{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg-2);height:160px;overflow-y:auto;line-height:1.6;margin-bottom:16px}
-    .status-log .log-ok{color:#4caf7d}
-    .status-log .log-warn{color:var(--accent)}
-    .status-log .log-err{color:#ff9090}
+    .status-log{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--fg-2);height:160px;overflow-y:auto;line-height:1.6;margin-bottom:16px}
+    .log-ok{color:#4caf7d}.log-warn{color:var(--accent)}.log-err{color:#ff9090}
 
-    /* ── Footer buttons ── */
+    /* ── Engine installer cards ── */
+    .engine-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+    .engine-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative}
+    .engine-card-name{font-size:13px;font-weight:700;margin-bottom:3px}
+    .engine-card-desc{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:10px}
+    .engine-card-meta{font-size:10.5px;color:var(--muted-2);margin-bottom:8px;font-family:'JetBrains Mono',ui-monospace,monospace}
+    .engine-install-btn{height:28px;padding:0 12px;border-radius:6px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;transition:background .12s,opacity .12s;border:1px solid rgba(244,183,64,.35);background:rgba(244,183,64,.12);color:var(--accent)}
+    .engine-install-btn:hover{background:rgba(244,183,64,.2)}
+    .engine-install-btn:disabled{opacity:.45;cursor:not-allowed}
+    .engine-install-btn.installed{background:rgba(76,175,125,.1);border-color:rgba(76,175,125,.3);color:#4caf7d}
+    .engine-install-btn.installing{background:rgba(244,183,64,.06);color:var(--muted)}
+    .engine-status{font-size:10.5px;color:var(--muted);margin-top:5px;min-height:14px}
+    .engine-status.ok{color:#4caf7d}.engine-status.err{color:#ff9090}
+
+    /* Whisper row */
+    .whisper-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px}
+    .whisper-install-btn{height:28px;padding:0 12px;border-radius:6px;font-size:11.5px;font-weight:700;border:1px solid rgba(244,183,64,.35);background:rgba(244,183,64,.12);color:var(--accent);cursor:pointer;transition:background .12s}
+    .whisper-install-btn:hover{background:rgba(244,183,64,.2)}
+    .whisper-install-btn.installed{background:rgba(76,175,125,.1);border-color:rgba(76,175,125,.3);color:#4caf7d;cursor:default}
+
     .wiz-footer{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-top:1px solid var(--border);background:var(--panel)}
     .btn-back{height:36px;padding:0 16px;border-radius:7px;border:1px solid var(--border-strong);color:var(--fg-2);font-size:13px;font-weight:500;transition:background .12s}
     .btn-back:hover{background:var(--panel-2)}
@@ -130,9 +132,10 @@
     <div class="wiz-steps">
       <div class="wiz-step-tab active" id="tab-0">Path</div>
       <div class="wiz-step-tab" id="tab-1">Configure</div>
-      <div class="wiz-step-tab" id="tab-2">Verify</div>
-      <div class="wiz-step-tab" id="tab-3">First song</div>
-      <div class="wiz-step-tab" id="tab-4">Done</div>
+      <div class="wiz-step-tab" id="tab-2">Engines</div>
+      <div class="wiz-step-tab" id="tab-3">Verify</div>
+      <div class="wiz-step-tab" id="tab-4">First song</div>
+      <div class="wiz-step-tab" id="tab-5">Done</div>
     </div>
 
     <!-- ── Step 0: Choose path ── -->
@@ -152,18 +155,18 @@
           <label class="path-card" id="card-local">
             <input type="radio" name="path" value="local"/>
             <div class="path-card-icon">💻</div>
-            <div class="path-card-title">Local (CPU)</div>
-            <div class="path-card-desc">Runs Demucs on your machine. No internet needed after setup, but expect 10–40 min per song on CPU.</div>
+            <div class="path-card-title">Local (CPU / GPU)</div>
+            <div class="path-card-desc">Runs the separation engine on your machine. No internet needed after setup. Slow on CPU, fast with a GPU.</div>
             <span class="path-badge badge-slow">Slow without GPU</span>
           </label>
         </div>
 
         <div class="info-box warn" id="local-warn" style="display:none">
-          <strong>⚠ Mobile data warning:</strong> The local path downloads ~2.3 GB of Demucs model weights on first use. Run the local setup on Wi-Fi.
+          <strong>⚠ Mobile data warning:</strong> The local path downloads model weights (varies per engine, ~400 MB – 2.3 GB) on first use. Do this on Wi-Fi.
         </div>
 
         <div class="info-box" id="colab-info">
-          <strong>What Colab does:</strong> Opens a free GPU notebook in your browser. You run it once per song — it handles Demucs, Whisper transcription, BPM and key detection. The output ZIP drops into your Google Drive (or you download it) and you drag it into mwtn.
+          <strong>What Colab does:</strong> Opens a free GPU notebook in your browser. You run it once per song — it handles separation, Whisper transcription, BPM and key detection. The output ZIP goes to your Google Drive and you drag it into mwtn.
         </div>
       </div>
     </div>
@@ -179,12 +182,12 @@
           <div class="field-group">
             <label class="field-label" for="drivePath">Google Drive root path</label>
             <input class="field-input" id="drivePath" type="text" placeholder="e.g. H:\My Drive  or  /Users/you/Google Drive/My Drive"/>
-            <div class="field-hint">This is the top-level Google Drive folder on your computer (via Drive for Desktop). On Windows it's usually <code>G:\My Drive</code> or <code>H:\My Drive</code>. On Mac: <code>/Users/you/Library/CloudStorage/GoogleDrive-you@gmail.com/My Drive</code></div>
+            <div class="field-hint">Top-level Google Drive folder on your machine (via Drive for Desktop). Windows: <code>G:\My Drive</code>. Mac: <code>/Users/you/Library/CloudStorage/GoogleDrive-…/My Drive</code></div>
           </div>
           <div class="field-group">
             <label class="field-label" for="folderName">mwtn output folder name</label>
             <input class="field-input" id="folderName" type="text" value="mwtn-outputs" placeholder="mwtn-outputs"/>
-            <div class="field-hint">Must match <code>DRIVE_OUTPUT_FOLDER</code> in Cell 3 of the Colab notebook. Default: <code>mwtn-outputs</code></div>
+            <div class="field-hint">Must match <code>DRIVE_OUTPUT_FOLDER</code> in Cell 3 of the Colab notebook.</div>
           </div>
           <div class="info-box">
             mwtn will look for output ZIPs at: <strong><code id="drivePreview">H:\My Drive\mwtn-outputs</code></strong>
@@ -194,23 +197,73 @@
         <!-- Local config -->
         <div id="local-cfg" style="display:none">
           <div class="field-group">
-            <label class="field-label" for="modelSelect">Separation model</label>
-            <select class="field-input" id="modelSelect" id="modelSelect">
-              <option value="htdemucs_6s">htdemucs_6s — 6 stems (vocals/drums/bass/other/guitar/piano) — recommended</option>
-              <option value="htdemucs_ft">htdemucs_ft — 4 stems (vocals/drums/bass/other) — faster</option>
+            <label class="field-label" for="whisperModelSelect">Whisper model (lyrics transcription)</label>
+            <select class="field-input" id="whisperModelSelect">
+              <option value="tiny">tiny — fastest, least accurate (~75 MB)</option>
+              <option value="base" selected>base — good balance (~145 MB) — recommended</option>
+              <option value="small">small — better accuracy (~460 MB)</option>
+              <option value="medium">medium — high accuracy (~1.5 GB)</option>
+              <option value="large">large — best accuracy (~3 GB)</option>
             </select>
-            <div class="field-hint" id="model-cost-hint">First-run download: ~2.3 GB. Run on Wi-Fi.</div>
+            <div class="field-hint">Downloaded on first use. Choose <strong>base</strong> unless you have storage and time to spare. Skip if you don't need lyrics.</div>
           </div>
           <div class="info-box warn">
-            <strong>Requirements:</strong> Python 3.10+, torch, demucs, ffmpeg.<br>
-            The <code>activate.ps1</code> / <code>activate.sh</code> script installs everything. Run it before using local import.
+            <strong>⚠ Mobile data:</strong> Model weights download on first use. See sizes above. Use Wi-Fi.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Step 2: Verify ── -->
+    <!-- ── Step 2: Engines (local path only, Colab path shows info) ── -->
     <div class="step" id="step-2">
+      <div class="wiz-body">
+
+        <!-- Colab view -->
+        <div id="engines-colab-view">
+          <h2>Separation engine</h2>
+          <p class="step-desc">On the Colab path, Demucs runs on Google's GPU — nothing to install on your machine. The notebook handles everything.</p>
+          <div class="info-box">
+            The default notebook uses <strong>htdemucs_6s</strong> (6 stems: vocals, drums, bass, guitar, piano, other). You can switch models in Colab Cell 3.
+          </div>
+          <div class="info-box warn">
+            <strong>⚠ Colab data cost:</strong> The notebook downloads ~3.5 GB of model weights (Demucs + Whisper) on its first run in a new session. Always do this on Wi-Fi.
+          </div>
+        </div>
+
+        <!-- Local view -->
+        <div id="engines-local-view" style="display:none">
+          <h2>Install a separation engine</h2>
+          <p class="step-desc">Choose at least one. The installer runs <code>pip install</code> in the background — you can see progress below. You only need one engine to get started.</p>
+
+          <div class="engine-grid" id="engineGrid">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Install log -->
+          <div class="status-log" id="installLog" style="display:none"></div>
+
+          <div class="field-group" style="margin-top:4px">
+            <label class="field-label">Whisper (lyrics transcription — optional)</label>
+            <div class="whisper-row">
+              <div>
+                <div style="font-size:13px;font-weight:600;margin-bottom:2px">openai-whisper</div>
+                <div style="font-size:11px;color:var(--muted)">Word-level lyrics sync. Model downloaded on first transcription.</div>
+              </div>
+              <button class="whisper-install-btn" id="whisperInstallBtn">Install</button>
+            </div>
+            <div id="whisperStatus" class="engine-status"></div>
+          </div>
+
+          <div class="info-box warn" style="margin-top:8px">
+            <strong>⚠ Mobile data:</strong> Each engine downloads model weights on first run (sizes listed per engine). Do installs and first-run separations on Wi-Fi.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Step 3: Verify ── -->
+    <div class="step" id="step-3">
       <div class="wiz-body">
         <h2>Checking your setup</h2>
         <p class="step-desc">Running a quick check to make sure everything is in place.</p>
@@ -220,22 +273,26 @@
         <ul class="checklist" id="checkList">
           <li>
             <div class="check-icon spin" id="chk-backend">⟳</div>
-            <div><strong>Backend API</strong> — FastAPI server responding at /api/songs</div>
+            <div><strong>Backend API</strong> — FastAPI server responding</div>
           </li>
           <li>
-            <div class="check-icon" id="chk-ffmpeg" style="background:var(--panel-3);color:var(--muted)">?</div>
-            <div><strong>ffmpeg</strong> — required for audio mixing and export</div>
+            <div class="check-icon idle" id="chk-ffmpeg">?</div>
+            <div><strong>ffmpeg</strong> — audio mixing and export</div>
           </li>
           <li>
-            <div class="check-icon" id="chk-librosa" style="background:var(--panel-3);color:var(--muted)">?</div>
+            <div class="check-icon idle" id="chk-librosa">?</div>
             <div><strong>librosa / soundfile</strong> — BPM and key detection</div>
           </li>
-          <li id="chk-demucs-row" style="display:none">
-            <div class="check-icon" id="chk-demucs" style="background:var(--panel-3);color:var(--muted)">?</div>
-            <div><strong>Demucs</strong> — local separation engine</div>
+          <li id="chk-engine-row" style="display:none">
+            <div class="check-icon idle" id="chk-engine">?</div>
+            <div><strong>Separation engine</strong> — <span id="chk-engine-name">—</span></div>
+          </li>
+          <li id="chk-whisper-row" style="display:none">
+            <div class="check-icon idle" id="chk-whisper">?</div>
+            <div><strong>Whisper</strong> — lyrics transcription</div>
           </li>
           <li id="chk-drive-row" style="display:none">
-            <div class="check-icon" id="chk-drive" style="background:var(--panel-3);color:var(--muted)">?</div>
+            <div class="check-icon idle" id="chk-drive">?</div>
             <div><strong>Drive folder</strong> — <span id="chk-drive-path"></span></div>
           </li>
         </ul>
@@ -244,8 +301,8 @@
       </div>
     </div>
 
-    <!-- ── Step 3: First song ── -->
-    <div class="step" id="step-3">
+    <!-- ── Step 4: First song ── -->
+    <div class="step" id="step-4">
       <div class="wiz-body">
         <h2>Add your first song</h2>
         <p class="step-desc">Choose how to get a song into mwtn.</p>
@@ -253,10 +310,10 @@
         <div id="first-song-colab">
           <ol class="checklist" style="list-style:none;counter-reset:steps">
             <li style="display:flex;gap:12px;margin-bottom:14px">
-              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;font-weight:700;flex-shrink:0">1</div>
+              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;flex-shrink:0">1</div>
               <div>
                 <strong>Open the Colab notebook</strong><br>
-                <span style="font-size:12.5px;color:var(--muted)">Runtime → Change runtime type → <strong>T4 GPU</strong> (free)</span><br>
+                <span style="font-size:12.5px;color:var(--muted)">Runtime → Change runtime type → <strong>T4 GPU</strong> (free tier)</span><br>
                 <a href="#" id="openColabLink" style="font-size:12.5px;color:var(--accent);display:inline-flex;align-items:center;gap:4px;margin-top:4px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   Open mwtn_notebook.ipynb in Colab
@@ -264,47 +321,46 @@
               </div>
             </li>
             <li style="display:flex;gap:12px;margin-bottom:14px">
-              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;font-weight:700;flex-shrink:0">2</div>
+              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;flex-shrink:0">2</div>
               <div>
-                <strong>Run Cell 3 → set your song file path in Cell 4</strong><br>
-                <span style="font-size:12.5px;color:var(--muted)">Upload your mp3/wav to Google Drive, set <code>DRIVE_FILE_PATH</code></span>
+                <strong>Set your song file path in Cell 4</strong><br>
+                <span style="font-size:12.5px;color:var(--muted)">Upload your mp3/wav to Google Drive, then set <code>DRIVE_FILE_PATH</code></span>
               </div>
             </li>
             <li style="display:flex;gap:12px;margin-bottom:14px">
-              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;font-weight:700;flex-shrink:0">3</div>
+              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;flex-shrink:0">3</div>
               <div>
                 <strong>Run all cells</strong><br>
                 <span style="font-size:12.5px;color:var(--muted)">Takes ~2 min on T4 GPU. Output ZIP goes to Google Drive automatically.</span>
               </div>
             </li>
             <li style="display:flex;gap:12px">
-              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;font-weight:700;flex-shrink:0">4</div>
+              <div class="check-icon ok" style="width:24px;height:24px;font-size:12px;flex-shrink:0">4</div>
               <div>
                 <strong>Drop the ZIP into mwtn</strong><br>
-                <span style="font-size:12.5px;color:var(--muted)">Download it from Drive and drag it into the mwtn window, or use Settings → Scan Drive.</span>
+                <span style="font-size:12.5px;color:var(--muted)">Download from Drive and drag it into the mwtn window, or use Settings → Scan Drive.</span>
               </div>
             </li>
           </ol>
-
           <div class="info-box warn">
-            <strong>⚠ Data cost:</strong> The Colab notebook downloads ~3.5 GB of model weights (Demucs + Whisper) on its first run in a new session. Do this on Wi-Fi. Subsequent runs in the same session cost nothing extra.
+            <strong>⚠ Colab first-run data cost:</strong> Downloads ~3.5 GB (Demucs + Whisper model weights) on first session. Always do this on Wi-Fi.
           </div>
         </div>
 
         <div id="first-song-local" style="display:none">
           <div class="info-box">
             <strong>How to import a song locally:</strong><br>
-            Click the <strong>Import</strong> button in the top-right of the mwtn window and drop an audio file (mp3, wav, flac, m4a). The backend runs Demucs on your machine — expect 10–40 minutes on CPU.
+            Click the <strong>Import</strong> button (top bar) or drag an audio file (mp3, wav, flac, m4a) onto the mwtn window. The backend runs the separation engine you installed — expect 10–40 min on CPU.
           </div>
           <div class="info-box warn">
-            <strong>⚠ First-run:</strong> Demucs downloads ~2.3 GB of model weights. Run on Wi-Fi.
+            <strong>⚠ First-run:</strong> The engine downloads model weights on its first separation. Run on Wi-Fi.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Step 4: Done ── -->
-    <div class="step" id="step-4">
+    <!-- ── Step 5: Done ── -->
+    <div class="step" id="step-5">
       <div class="wiz-body" style="text-align:center;padding:40px 28px">
         <div style="font-size:48px;margin-bottom:16px">🎵</div>
         <h2 style="font-size:20px;margin-bottom:8px">You're all set!</h2>
@@ -319,7 +375,7 @@
     <!-- Footer -->
     <div class="wiz-footer">
       <button class="btn-back hidden" id="btnBack">← Back</button>
-      <span class="wiz-footer-note" id="stepNote">Step 1 of 5</span>
+      <span class="wiz-footer-note" id="stepNote">Step 1 of 6</span>
       <button class="btn-next" id="btnNext">Continue →</button>
     </div>
 
@@ -327,87 +383,275 @@
 </div>
 
 <script>
-const STEPS = ['step-0','step-1','step-2','step-3','step-4'];
-const TABS  = ['tab-0','tab-1','tab-2','tab-3','tab-4'];
-const NOTES = ['Step 1 of 5','Step 2 of 5','Step 3 of 5','Step 4 of 5','All done!'];
-const PROGRESS = [20,40,60,80,100];
-let current = 0;
-let selectedPath = 'colab';
+// ── Engine catalogue ─────────────────────────────────────────────────────────
+const ENGINES = [
+  {
+    id: 'demucs',
+    name: 'Demucs',
+    stems: '6 stems (htdemucs_6s)',
+    desc: 'Meta\'s flagship model. Best quality vocals + instruments. Default in Colab.',
+    pip: 'torch demucs',
+    size: '~2.3 GB on first run',
+    recommended: true,
+  },
+  {
+    id: 'openunmix',
+    name: 'Open-Unmix',
+    stems: '4 stems',
+    desc: 'Inria / NIME research model. MIT licensed. Lighter than Demucs.',
+    pip: 'openunmix torchaudio',
+    size: '~400 MB',
+  },
+  {
+    id: 'spleeter',
+    name: 'Spleeter',
+    stems: '2 or 5 stems',
+    desc: 'Deezer\'s fast TensorFlow model. Quickest separation, lower quality.',
+    pip: 'spleeter',
+    size: '~130 MB',
+  },
+  {
+    id: 'mdxnet',
+    name: 'MDX-Net',
+    stems: '4 stems',
+    desc: '2021 MDX challenge winner. Good vocal isolation. Via audio-separator.',
+    pip: 'audio-separator[cpu]',
+    size: '~85 MB',
+  },
+  {
+    id: 'bs_roformer',
+    name: 'BS-RoFormer',
+    stems: '2 stems (vocals/inst)',
+    desc: 'Transformer-based. State-of-the-art vocal isolation accuracy.',
+    pip: 'bs-roformer-infer',
+    size: '~450 MB',
+  },
+  {
+    id: 'melband_roformer',
+    name: 'MelBand-RoFormer',
+    stems: '2 stems (vocals/inst)',
+    desc: 'Faster variant of BS-RoFormer. Mel-spectrogram-based.',
+    pip: 'melband-roformer-infer',
+    size: '~450 MB',
+  },
+];
 
-// Path selection
+// ── State ────────────────────────────────────────────────────────────────────
+const STEPS    = ['step-0','step-1','step-2','step-3','step-4','step-5'];
+const TABS     = ['tab-0','tab-1','tab-2','tab-3','tab-4','tab-5'];
+const NOTES    = ['Step 1 of 6','Step 2 of 6','Step 3 of 6','Step 4 of 6','Step 5 of 6','All done!'];
+const PROGRESS = [17, 33, 50, 67, 83, 100];
+let current      = 0;
+let selectedPath = 'colab';
+const installRunning = {};   // engine id → true if install is in flight
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function showStep(n) {
+  STEPS.forEach((id, i) => $(id).classList.toggle('active', i === n));
+  TABS.forEach((id, i) => {
+    $(id).classList.toggle('active', i === n);
+    $(id).classList.toggle('done', i < n);
+  });
+  $('progressFill').style.width = PROGRESS[n] + '%';
+  $('stepNote').textContent = NOTES[n];
+  $('btnBack').classList.toggle('hidden', n === 0);
+  $('btnNext').classList.toggle('hidden', n === STEPS.length - 1);
+
+  if (n === 1) {
+    const isLocal = selectedPath === 'local';
+    $('colab-cfg').style.display   = isLocal ? 'none' : '';
+    $('local-cfg').style.display   = isLocal ? ''     : 'none';
+    $('cfg-title').textContent = isLocal ? 'Configure local separation' : 'Configure Colab path';
+    $('cfg-desc').textContent  = isLocal
+      ? 'Choose a Whisper model size for local lyrics transcription.'
+      : 'Tell mwtn where to find your Google Drive output folder.';
+  }
+
+  if (n === 2) {
+    const isLocal = selectedPath === 'local';
+    $('engines-colab-view').style.display = isLocal ? 'none' : '';
+    $('engines-local-view').style.display = isLocal ? ''     : 'none';
+    if (isLocal) renderEngineGrid();
+  }
+
+  if (n === 3) runChecks();
+
+  if (n === 4) {
+    $('first-song-colab').style.display = selectedPath === 'colab' ? '' : 'none';
+    $('first-song-local').style.display = selectedPath === 'local' ? '' : 'none';
+  }
+}
+
+// ── Path selection ───────────────────────────────────────────────────────────
 document.querySelectorAll('.path-card').forEach(card => {
   card.addEventListener('click', () => {
     document.querySelectorAll('.path-card').forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     selectedPath = card.querySelector('input').value;
     card.querySelector('input').checked = true;
-    document.getElementById('local-warn').style.display = selectedPath === 'local' ? '' : 'none';
-    document.getElementById('colab-info').style.display = selectedPath === 'colab' ? '' : 'none';
+    $('local-warn').style.display  = selectedPath === 'local' ? '' : 'none';
+    $('colab-info').style.display  = selectedPath === 'colab' ? '' : 'none';
   });
 });
 
-// Drive path preview
+// ── Drive path preview ───────────────────────────────────────────────────────
 function updateDrivePreview() {
-  const path  = document.getElementById('drivePath').value.trim() || 'H:\\My Drive';
-  const name  = document.getElementById('folderName').value.trim() || 'mwtn-outputs';
-  const sep   = path.includes('/') ? '/' : '\\';
-  document.getElementById('drivePreview').textContent = `${path}${sep}${name}`;
+  const path = $('drivePath').value.trim() || 'H:\\My Drive';
+  const name = $('folderName').value.trim() || 'mwtn-outputs';
+  const sep  = path.includes('/') ? '/' : '\\';
+  $('drivePreview').textContent = `${path}${sep}${name}`;
 }
-document.getElementById('drivePath').addEventListener('input', updateDrivePreview);
-document.getElementById('folderName').addEventListener('input', updateDrivePreview);
+$('drivePath').addEventListener('input', updateDrivePreview);
+$('folderName').addEventListener('input', updateDrivePreview);
 
-function showStep(n) {
-  STEPS.forEach((id,i) => {
-    const el = document.getElementById(id);
-    el.classList.toggle('active', i === n);
-  });
-  TABS.forEach((id,i) => {
-    const el = document.getElementById(id);
-    el.classList.toggle('active', i === n);
-    el.classList.toggle('done', i < n);
-  });
-  document.getElementById('progressFill').style.width = PROGRESS[n] + '%';
-  document.getElementById('stepNote').textContent = NOTES[n];
-  document.getElementById('btnBack').classList.toggle('hidden', n === 0);
-  document.getElementById('btnNext').classList.toggle('hidden', n === STEPS.length - 1);
-
-  if (n === 1) {
-    // Show correct config panel
-    document.getElementById('colab-cfg').style.display = selectedPath === 'colab' ? '' : 'none';
-    document.getElementById('local-cfg').style.display = selectedPath === 'local' ? '' : 'none';
-    document.getElementById('cfg-title').textContent = selectedPath === 'colab' ? 'Configure Colab path' : 'Configure local separation';
-    document.getElementById('cfg-desc').textContent = selectedPath === 'colab'
-      ? 'Tell mwtn where to find your Google Drive output folder.'
-      : 'Choose the separation model for local import.';
-  }
-
-  if (n === 2) runChecks();
-
-  if (n === 3) {
-    document.getElementById('first-song-colab').style.display = selectedPath === 'colab' ? '' : 'none';
-    document.getElementById('first-song-local').style.display = selectedPath === 'local' ? '' : 'none';
-  }
-}
-
-// Navigation
-document.getElementById('btnNext').addEventListener('click', () => {
+// ── Navigation ───────────────────────────────────────────────────────────────
+$('btnNext').addEventListener('click', () => {
   if (current < STEPS.length - 1) { current++; showStep(current); }
 });
-document.getElementById('btnBack').addEventListener('click', () => {
+$('btnBack').addEventListener('click', () => {
   if (current > 0) { current--; showStep(current); }
 });
-document.getElementById('launchBtn').addEventListener('click', () => {
-  window.location.href = '/';
-});
-document.getElementById('openColabLink').addEventListener('click', (e) => {
+$('launchBtn').addEventListener('click', () => { window.location.href = '/'; });
+$('openColabLink').addEventListener('click', e => {
   e.preventDefault();
   window.open('https://colab.research.google.com', '_blank', 'noopener,noreferrer');
 });
 
-// ── Checks ──────────────────────────────────────────────────────────────────
+// ── Engine installer grid ────────────────────────────────────────────────────
+async function renderEngineGrid() {
+  const grid = $('engineGrid');
+  if (!grid) return;
+
+  // Fetch which engines are already installed
+  let installed = {};
+  try {
+    const r = await fetch('/api/setup/check');
+    const d = await r.json();
+    installed = d.engines || {};
+  } catch {}
+
+  grid.innerHTML = '';
+  ENGINES.forEach(engine => {
+    const isInstalled = !!installed[engine.id];
+    const card = document.createElement('div');
+    card.className = 'engine-card';
+    card.innerHTML = `
+      <div class="engine-card-name">
+        ${engine.name}
+        ${engine.recommended ? '<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(244,183,64,.15);color:var(--accent);border:1px solid rgba(244,183,64,.3);margin-left:5px">★ Recommended</span>' : ''}
+      </div>
+      <div class="engine-card-desc">${engine.desc}</div>
+      <div class="engine-card-meta">stems: ${engine.stems} · ${engine.size}</div>
+      <button class="engine-install-btn${isInstalled ? ' installed' : ''}" data-engine="${engine.id}" ${isInstalled ? 'disabled' : ''}>
+        ${isInstalled ? '✓ Installed' : 'Install'}
+      </button>
+      <div class="engine-status" id="status-${engine.id}">${isInstalled ? '<span class="ok">Ready to use</span>' : ''}</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Wire install buttons
+  grid.querySelectorAll('.engine-install-btn:not(.installed)').forEach(btn => {
+    btn.addEventListener('click', () => installEngine(btn.dataset.engine, btn));
+  });
+
+  // Wire Whisper install button
+  let whisperInstalled = false;
+  try {
+    const r = await fetch('/api/setup/check');
+    const d = await r.json();
+    whisperInstalled = !!d.whisper;
+  } catch {}
+  const wb = $('whisperInstallBtn');
+  if (whisperInstalled) {
+    wb.textContent = '✓ Installed';
+    wb.classList.add('installed');
+    wb.disabled = true;
+    $('whisperStatus').innerHTML = '<span class="ok">Ready to use</span>';
+  } else {
+    wb.addEventListener('click', () => installEngine('whisper', wb, 'whisperStatus'));
+  }
+}
+
+async function installEngine(engineId, btn, statusElId) {
+  if (installRunning[engineId]) return;
+  installRunning[engineId] = true;
+
+  const statusEl = $(statusElId || `status-${engineId}`);
+  const logEl    = $('installLog');
+  if (logEl) logEl.style.display = '';
+
+  btn.disabled    = true;
+  btn.textContent = 'Installing…';
+  btn.classList.add('installing');
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--muted)">Starting pip install…</span>';
+
+  function appendLog(msg) {
+    if (!logEl) return;
+    const line = document.createElement('div');
+    line.textContent = msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  try {
+    const startRes = await fetch('/api/setup/install', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ engine: engineId }),
+    });
+    if (!startRes.ok) {
+      const err = await startRes.json().catch(() => ({}));
+      throw new Error(err.detail || startRes.statusText);
+    }
+    const { job_id } = await startRes.json();
+
+    // Poll until done
+    let done = false;
+    while (!done) {
+      await new Promise(r => setTimeout(r, 1200));
+      const poll = await fetch(`/api/setup/install/${encodeURIComponent(job_id)}/status`);
+      const data = await poll.json();
+
+      // Show new log lines
+      const newLines = data.log || [];
+      if (logEl) {
+        logEl.innerHTML = '';
+        newLines.forEach(l => appendLog(l));
+      }
+
+      if (statusEl) statusEl.textContent = data.status_message || '';
+
+      if (data.state === 'done') {
+        done = true;
+        btn.textContent = '✓ Installed';
+        btn.classList.remove('installing');
+        btn.classList.add('installed');
+        if (statusEl) statusEl.innerHTML = '<span class="ok">Installed successfully</span>';
+      } else if (data.state === 'error') {
+        done = true;
+        btn.textContent = 'Retry';
+        btn.disabled = false;
+        btn.classList.remove('installing');
+        if (statusEl) statusEl.innerHTML = `<span class="err">Failed — check log above</span>`;
+        installRunning[engineId] = false;
+      }
+    }
+  } catch (err) {
+    btn.textContent = 'Retry';
+    btn.disabled    = false;
+    btn.classList.remove('installing');
+    if (statusEl) statusEl.innerHTML = `<span class="err">Error: ${err.message}</span>`;
+    installRunning[engineId] = false;
+  }
+}
+
+// ── System checks ────────────────────────────────────────────────────────────
 async function runChecks() {
-  const log = document.getElementById('checkLog');
-  const errBox = document.getElementById('check-error');
+  const log    = $('checkLog');
+  const errBox = $('check-error');
   errBox.style.display = 'none';
   log.innerHTML = '';
 
@@ -419,36 +663,40 @@ async function runChecks() {
     log.scrollTop = log.scrollHeight;
   }
 
-  function setChk(id, state, text) {
-    const el = document.getElementById(id);
-    el.className = 'check-icon ' + (state === 'ok' ? 'ok' : state === 'fail' ? 'fail' : 'warn');
-    el.textContent = state === 'ok' ? '✓' : state === 'fail' ? '✗' : '⚠';
-    el.style.removeProperty('background');
-    el.style.removeProperty('color');
+  function setChk(id, state) {
+    const el = $(id);
+    if (!el) return;
+    el.className = `check-icon ${state}`;
+    el.textContent = state === 'ok' ? '✓' : state === 'fail' ? '✗' : state === 'warn' ? '⚠' : state === 'spin' ? '⟳' : '?';
   }
 
-  // Show demucs / drive row based on path
-  document.getElementById('chk-demucs-row').style.display = selectedPath === 'local' ? '' : 'none';
-  document.getElementById('chk-drive-row').style.display = selectedPath === 'colab' ? '' : 'none';
+  const isLocal = selectedPath === 'local';
+  $('chk-engine-row').style.display  = isLocal ? '' : 'none';
+  $('chk-whisper-row').style.display = isLocal ? '' : 'none';
+  $('chk-drive-row').style.display   = isLocal ? 'none' : '';
 
-  const drivePath = (document.getElementById('drivePath').value.trim() || '') +
-    '\\' + (document.getElementById('folderName').value.trim() || 'mwtn-outputs');
-  document.getElementById('chk-drive-path').textContent = drivePath;
+  const drivePath = ($('drivePath').value.trim() || '') +
+    ($('drivePath').value.includes('/') ? '/' : '\\') +
+    ($('folderName').value.trim() || 'mwtn-outputs');
+  $('chk-drive-path').textContent = drivePath;
 
-  // Save settings first
+  // Save settings
   try {
     await fetch('/api/setup/save', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        path:    selectedPath,
-        drive_path:   document.getElementById('drivePath').value.trim(),
-        folder_name:  document.getElementById('folderName').value.trim() || 'mwtn-outputs',
-        local_model:  document.getElementById('modelSelect').value,
-      })
+        path:          selectedPath,
+        drive_path:    $('drivePath').value.trim(),
+        folder_name:   $('folderName').value.trim() || 'mwtn-outputs',
+        local_model:   'htdemucs_6s',
+        whisper_model: $('whisperModelSelect').value || 'base',
+      }),
     });
-  } catch(e) { /* non-fatal */ }
+  } catch {}
 
+  // Backend
+  setChk('chk-backend', 'spin');
   appendLog('Checking backend…');
   try {
     const r = await fetch('/api/songs');
@@ -460,34 +708,46 @@ async function runChecks() {
     appendLog('✗ Backend not reachable: ' + e.message, 'log-err');
   }
 
+  // System tools
   appendLog('Checking system tools…');
   try {
-    const r = await fetch('/api/setup/check');
+    const r    = await fetch('/api/setup/check');
     const data = await r.json();
 
     setChk('chk-ffmpeg',  data.ffmpeg  ? 'ok' : 'fail');
     setChk('chk-librosa', data.librosa ? 'ok' : 'fail');
-    appendLog(data.ffmpeg  ? '✓ ffmpeg found'           : '✗ ffmpeg not found', data.ffmpeg  ? 'log-ok' : 'log-err');
-    appendLog(data.librosa ? '✓ librosa / soundfile OK' : '✗ librosa missing',  data.librosa ? 'log-ok' : 'log-err');
+    appendLog(data.ffmpeg  ? '✓ ffmpeg found'           : '✗ ffmpeg not found — install it with your package manager', data.ffmpeg  ? 'log-ok' : 'log-err');
+    appendLog(data.librosa ? '✓ librosa / soundfile OK' : '✗ librosa missing — run activate.ps1 / activate.sh',       data.librosa ? 'log-ok' : 'log-err');
 
-    if (selectedPath === 'local') {
-      setChk('chk-demucs', data.demucs ? 'ok' : 'warn');
-      appendLog(data.demucs ? '✓ Demucs installed' : '⚠ Demucs not found — install it to use local import', data.demucs ? 'log-ok' : 'log-warn');
+    if (isLocal) {
+      // Check at least one engine installed
+      const engines = data.engines || {};
+      const anyEngine = Object.values(engines).some(Boolean);
+      const installedNames = Object.entries(engines).filter(([,v])=>v).map(([k])=>k).join(', ') || 'none';
+      $('chk-engine-name').textContent = installedNames;
+      setChk('chk-engine', anyEngine ? 'ok' : 'warn');
+      appendLog(anyEngine ? `✓ Engines installed: ${installedNames}` : '⚠ No separation engine installed — go back and install one', anyEngine ? 'log-ok' : 'log-warn');
+
+      setChk('chk-whisper', data.whisper ? 'ok' : 'warn');
+      appendLog(data.whisper ? '✓ Whisper installed' : '⚠ Whisper not installed — lyrics will be skipped', data.whisper ? 'log-ok' : 'log-warn');
     }
 
-    if (selectedPath === 'colab') {
+    if (!isLocal) {
       setChk('chk-drive', data.drive_folder_exists ? 'ok' : 'warn');
-      appendLog(data.drive_folder_exists ? '✓ Drive output folder found' : '⚠ Drive folder not found yet (create it after running Colab)', data.drive_folder_exists ? 'log-ok' : 'log-warn');
+      appendLog(data.drive_folder_exists
+        ? '✓ Drive output folder found'
+        : '⚠ Drive folder not found yet — it will appear after your first Colab run',
+        data.drive_folder_exists ? 'log-ok' : 'log-warn');
     }
 
     if (!data.ffmpeg || !data.librosa) {
-      errBox.innerHTML = `<strong>Missing dependencies detected.</strong><br>Run <code>activate.ps1</code> (Windows) or <code>./activate.sh</code> (Mac/Linux) in the project folder to install them.`;
+      errBox.innerHTML = '<strong>Missing core dependencies.</strong> Run <code>activate.ps1</code> (Windows) or <code>./activate.sh</code> (Mac/Linux) to install them, then come back to this screen.';
       errBox.style.display = '';
     } else {
-      appendLog('All required checks passed.', 'log-ok');
+      appendLog('Core checks passed.', 'log-ok');
     }
   } catch(e) {
-    appendLog('Could not run system checks: ' + e.message, 'log-warn');
+    appendLog('Could not reach /api/setup/check: ' + e.message, 'log-warn');
   }
 }
 </script>
