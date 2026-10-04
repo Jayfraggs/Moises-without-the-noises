@@ -1,0 +1,34 @@
+# .dockerignore — keep the image lean
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Node
+electron/node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/src/
+
+# Data — mount at runtime, never bake into the image
+backend/data/
+backend/_cache/
+backend/_import_tmp/
+
+# Dev / editor
+.git/
+.gitignore
+.vscode/
+*.md
+*.ps1
+*.sh
+run_tests.py
+colab/
+
+# OS
+.DS_Store
+Thumbs.db

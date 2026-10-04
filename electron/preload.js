@@ -15,8 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Drive detection and configuration
   detectDrive: () => ipcRenderer.invoke('drive:detect'),
   getDriveConfig: () => ipcRenderer.invoke('drive:getConfig'),
-  setDriveConfig: (drivePath, mwtnFolder) =>
-    ipcRenderer.invoke('drive:setConfig', drivePath, mwtnFolder),
+  setDriveConfig: (drivePath, mwtnFolder, defaultModel) =>
+    ipcRenderer.invoke('drive:setConfig', drivePath, mwtnFolder, defaultModel),
 
   // File dialogs
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),

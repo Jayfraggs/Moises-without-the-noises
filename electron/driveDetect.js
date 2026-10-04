@@ -2,7 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const DEFAULT_MWNT_FOLDER = 'mwtn-outputs';
+const DEFAULT_MWTN_FOLDER = 'mwtn-outputs'; // must match DRIVE_OUTPUT_FOLDER in mwtn_notebook.ipynb Cell 3
 
 function resolveHomePath(filePath) {
   if (!filePath) return filePath;
@@ -17,7 +17,8 @@ function getConfigFilePath(userDataPath) {
 function normalizeConfig(data = {}) {
   return {
     drivePath: data.drivePath ?? null,
-    mwtnFolder: data.mwtnFolder || DEFAULT_MWNT_FOLDER,
+    mwtnFolder: data.mwtnFolder || DEFAULT_MWTN_FOLDER,
+    defaultModel: data.defaultModel || 'htdemucs_6s',
   };
 }
 
@@ -78,16 +79,17 @@ function getDriveConfig(userDataPath) {
     }
     return {
       drivePath: null,
-      mwtnFolder: DEFAULT_MWNT_FOLDER,
+      mwtnFolder: DEFAULT_MWTN_FOLDER,
     };
   }
 }
 
-function setDriveConfig(userDataPath, drivePath, mwtnFolder) {
+function setDriveConfig(userDataPath, drivePath, mwtnFolder, defaultModel) {
   const configPath = getConfigFilePath(userDataPath);
   const config = normalizeConfig({
     drivePath: drivePath || null,
     mwtnFolder: mwtnFolder,
+    defaultModel: defaultModel || 'htdemucs_6s',
   });
 
   try {
@@ -101,7 +103,7 @@ function setDriveConfig(userDataPath, drivePath, mwtnFolder) {
 }
 
 module.exports = {
-  DEFAULT_MWNT_FOLDER,
+  DEFAULT_MWTN_FOLDER,
   detectDrivePath,
   getDriveConfig,
   setDriveConfig,

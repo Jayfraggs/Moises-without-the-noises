@@ -1,0 +1,37 @@
+# docker-compose.yml — mwtn
+#
+# Quick start:
+#   docker compose up
+#
+# With your own data directory:
+#   MWTN_DATA=/path/to/your/stems docker compose up
+#
+# Drop Colab output ZIPs into the data directory and the app picks them up
+# automatically — no restart required.
+
+services:
+  mwtn:
+    build: .
+    image: mwtn:latest
+    container_name: mwtn
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist song data between container restarts.
+      # Change MWTN_DATA or the left-hand path to point at your stems folder.
+      - ${MWTN_DATA:-./backend/data}:/app/backend/data
+      # Cache (waveform scans, MP3 transcodes) — optional separate volume
+      - mwtn_cache:/app/backend/_cache
+    environment:
+      # Set to "production" to suppress uvicorn reload noise
+      - MWTN_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/songs"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mwtn_cache:

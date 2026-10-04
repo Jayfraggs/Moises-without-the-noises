@@ -1,47 +1,69 @@
 """
 bpm.py — Beat & tempo detection using librosa.
 
-Returns BPM and a list of beat timestamps (seconds). These are used by
-the frontend to drive the smart metronome click track and sync the
-beat visualizer.
+Returns BPM, beat timestamps, downbeats, and tempo stability. Stability
+is derived from the coefficient of variation of inter-beat intervals:
+CV=0 is perfectly metronomic, normalised to 0-100 (higher = more stable).
 
-librosa.beat.beat_track is the workhorse here. It uses a combination of
-onset detection and dynamic programming to find the most consistent
-tempo, then places beat times accordingly. It's not perfect — tempo
-changes within a song will confuse it — but it's the best open-source
-option without a GPU.
-
-Confidence: the returned beat times are more reliable than the BPM estimate
-on songs with complex rhythms or tempo drift. The BPM is a global average;
-don't use it for hard sync on songs that change tempo.
+Note: librosa's beat tracker has a 120 BPM prior. Very fast (>160 BPM) or
+very slow (<60 BPM) material may resolve to half/double time. For the Colab
+pipeline, the notebook runs the same detector — the mwtn project defers
+beat_this (the neural tracker) to a future v2 since it requires GPU or a
+local model download that contradicts the Colab-first design.
 """
+
+from __future__ import annotations
+
+import logging
 
 import librosa
 import numpy as np
+
+logger = logging.getLogger("mwtn.bpm")
 
 
 def detect_beats(audio_path: str) -> dict:
     """
     Returns:
         {
-          "bpm": float,              # global tempo estimate
-          "beats": [float, ...],     # beat timestamps in seconds
-          "downbeats": [float, ...], # every 4th beat (estimated bar starts)
+          "bpm":             float,
+          "beats":           [float, ...],   # beat timestamps in seconds
+          "downbeats":       [float, ...],   # every 4th beat (estimated)
+          "tempo_stability": int | None,     # 0-100, higher = more stable
         }
     """
     y, sr = librosa.load(audio_path, sr=None, mono=True)
 
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="frames")
-    beat_times = librosa.frames_to_time(beat_frames, sr=sr).tolist()
+    # Harmonic/percussive separation: beat tracking on percussive component
+    # gives a cleaner onset envelope.
+    try:
+        _, y_percussive = librosa.effects.hpss(y)
+    except Exception:
+        y_percussive = y
 
-    # Downbeats: librosa doesn't give us true downbeats without a meter
-    # analysis model, so we estimate by taking every 4th beat from the
-    # first one. This is wrong on songs in 3/4 or with pickup bars, but
-    # it's the correct assumption for the vast majority of popular music.
+    tempo_arr, beat_frames = librosa.beat.beat_track(
+        y=y_percussive, sr=sr, units="frames", trim=False
+    )
+    try:
+        tempo = float(tempo_arr[0])
+    except (TypeError, IndexError):
+        tempo = float(tempo_arr)
+
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr).tolist()
     downbeats = beat_times[::4]
+
+    # Tempo stability: 1 - CV of inter-beat intervals, clamped 0-100.
+    tempo_stability: int | None = None
+    if len(beat_times) > 2:
+        intervals = np.diff(beat_times)
+        mean_iv = float(intervals.mean())
+        if mean_iv > 0:
+            cv = float(intervals.std() / mean_iv)
+            tempo_stability = max(0, min(100, round((1 - min(cv, 1)) * 100)))
 
     return {
         "bpm": round(float(np.squeeze(tempo)), 2),
         "beats": [round(t, 4) for t in beat_times],
         "downbeats": [round(t, 4) for t in downbeats],
+        "tempo_stability": tempo_stability,
     }
