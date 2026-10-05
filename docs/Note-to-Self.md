@@ -40,3 +40,6 @@ Note detection complete.)
 Populate the `.github\instructions\AGENTS-instructions.md` ✅
 
 Also fix the collapse of the lyrics panel
+Look for issues with the colab notebook. Or just maake it so that whatere options are made, it copy colab settings button just gives them the whole notebook the is correctly filled
+
+Also attempt to automate the colab run using the colab CLI
