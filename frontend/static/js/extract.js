@@ -1,18 +1,18 @@
 /**
- * extract.js — Extract configuration modal.
+ * extract.js — Extraction Settings modal.
  *
- * Replaces the topbar stem chip strip with a button that opens a modal where
- * the user picks their separation model, stem subset, and extra options
- * (lyrics, bass solfège). A "Copy Colab settings" button produces a string
- * the user pastes into Colab Cell 3 — no server call is made here.
+ * Two action paths:
+ *   A) Copy Colab Settings — builds a string to paste into Colab Cell 3.
+ *   B) Run Locally — triggers POST /api/import with the staged audio file
+ *      using the selected model; hands off to the Import module for polling.
  *
  * Model data is fetched once from GET /api/config and cached.
  */
 export class Extract {
   constructor({ API }) {
     this.API      = API;
-    this._config  = null;   // cached /api/config response
-    this._model   = null;   // currently selected model key
+    this._config  = null;
+    this._model   = null;
     this._stems   = new Set();
     this._lyrics  = true;
     this._solfa   = false;
@@ -23,6 +23,7 @@ export class Extract {
     const modal = document.getElementById('extractModal');
     const close = document.getElementById('extractModalClose');
     const copy  = document.getElementById('extractCopyBtn');
+    const runLocal = document.getElementById('extractRunLocalBtn');
 
     btn?.addEventListener('click', async () => {
       await this._ensureConfig();
@@ -32,14 +33,19 @@ export class Extract {
 
     close?.addEventListener('click', () => modal?.classList.add('hidden'));
 
-    // Close on backdrop click
     modal?.addEventListener('click', (e) => {
       if (e.target === modal) modal.classList.add('hidden');
     });
 
     copy?.addEventListener('click', () => this._copySettings(copy));
 
-    // Lyrics / solfa toggles
+    runLocal?.addEventListener('click', () => {
+      modal?.classList.add('hidden');
+      // Trigger the file picker so the user picks the audio file
+      // The selected model is read from extractModelSelect in import.js
+      document.getElementById('fileInput')?.click();
+    });
+
     document.getElementById('extractLyrics')?.addEventListener('change', (e) => {
       this._lyrics = e.target.checked;
     });
@@ -53,7 +59,6 @@ export class Extract {
     try {
       this._config = await this.API.getConfig();
       this._model  = this._config.default_model;
-      // Seed stems from default model
       const modelStems = this._config.separation_models[this._model]?.stems || [];
       this._stems = new Set(modelStems);
     } catch (err) {
@@ -83,12 +88,10 @@ export class Extract {
       select.appendChild(opt);
     });
 
-    // Remove old listener by replacing node
     const fresh = select.cloneNode(true);
     select.parentNode.replaceChild(fresh, select);
     fresh.addEventListener('change', () => {
       this._model = fresh.value;
-      // Reset stem selection to match the new model
       const modelStems = this._config.separation_models[this._model]?.stems || [];
       this._stems = new Set(modelStems);
       this._renderStemGrid();
@@ -106,13 +109,11 @@ export class Extract {
 
     grid.innerHTML = '';
 
-    // Model description line
     const descEl = document.createElement('p');
     descEl.className = 'extract-model-desc';
     descEl.textContent = desc;
     grid.appendChild(descEl);
 
-    // Stem checkboxes
     const checkWrap = document.createElement('div');
     checkWrap.className = 'extract-stem-checks';
     available.forEach(stem => {
@@ -144,7 +145,7 @@ export class Extract {
     const modelInfo = this._config.separation_models[this._model] || {};
     const mb = modelInfo.data_cost_mb;
     if (mb != null) {
-      el.textContent = `⚠ ~${mb} MB Colab download on first run for this model`;
+      el.textContent = `⚠ ~${mb} MB download on first run for this model`;
       el.style.display = '';
     } else {
       el.style.display = 'none';
@@ -165,7 +166,6 @@ export class Extract {
       btn.textContent = 'Copied!';
       setTimeout(() => { btn.textContent = orig; }, 1800);
     }).catch(() => {
-      // Fallback for environments without clipboard API
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';

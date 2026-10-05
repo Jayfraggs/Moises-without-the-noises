@@ -43,3 +43,20 @@ numpy>=2.0
 #
 # MEL-BAND ROFORMER (openmirlab/melband-roformer-infer — MIT). ~300 MB on first run.
 #   pip install melband-roformer-infer
+
+# ─── New features (v2) ────────────────────────────────────────────────────────
+
+# VOCAL SPLIT — second-pass lead/backing vocal separation.
+# Uses audio-separator with UVR-BVE-4B model (~200 MB ONNX on first use).
+# Same package as MDX-Net above — only one install needed.
+#   pip install "audio-separator[cpu]"
+
+# SECTION DETECTION — automatic song-structure labelling (intro/verse/chorus…).
+# Uses allin1 (Taejun Kim, ISMIR 2023, MIT licence) — ~120 MB model on first use.
+# Falls back to librosa novelty heuristic (no extra install) if allin1 unavailable.
+#   pip install allin1
+#
+# Note for Colab: allin1 downloads its model checkpoint to ~/.cache/allin1/.
+# To cache across sessions, set HF_HOME to a Google Drive path before importing
+# allin1 (e.g. os.environ["HF_HOME"] = "/content/drive/MyDrive/hf_cache").
+# Data cost: ~120 MB per Colab session without Drive caching.

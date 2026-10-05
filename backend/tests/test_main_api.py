@@ -205,6 +205,21 @@ def test_get_waveform_cached_second_call(client, data_dir):
     assert r2.status_code == 200
 
 
+def test_get_peaks_returns_waveform_map_for_ui(client, data_dir):
+    _make_song(data_dir, "song_peaks")
+    (data_dir / "song_peaks" / "peaks.json").write_text(json.dumps({
+        "vocals": [[-0.1, 0.1], [-0.2, 0.2]],
+        "drums": [[-0.3, 0.3]],
+    }))
+
+    r = client.get("/api/songs/song_peaks/peaks")
+    assert r.status_code == 200
+    body = r.json()
+    assert "vocals" in body
+    assert body["vocals"][0][0] == -0.1
+    assert body["drums"][0][1] == 0.3
+
+
 # ── PATCH /api/songs/{id}/sections ──────────────────────────────────────────
 
 def test_patch_sections(client, data_dir):
