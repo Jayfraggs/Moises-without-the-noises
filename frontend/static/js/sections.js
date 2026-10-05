@@ -33,15 +33,18 @@ export class Sections {
     this._trackEl    = document.getElementById('daw-sections-track');
     this._addBtn     = document.getElementById('sectionsAddBtn');
     this._clearBtn   = document.getElementById('sectionsClearBtn');
+    this._detectBtn  = document.getElementById('sectionsDetectBtn');
     this._saveInd    = document.getElementById('sectionsSaveIndicator');
   }
 
   init() {
-    this._addBtn?.addEventListener('click',   () => this._addAtPlayhead());
-    this._clearBtn?.addEventListener('click', () => this._clearAll());
+    this._addBtn?.addEventListener('click',    () => this._addAtPlayhead());
+    this._clearBtn?.addEventListener('click',  () => this._clearAll());
+    this._detectBtn?.addEventListener('click', () => this._autoDetect());
     // Show buttons now (they were hidden until a song loads)
     this._addBtn?.classList.remove('hidden');
     this._clearBtn?.classList.remove('hidden');
+    this._detectBtn?.classList.remove('hidden');
   }
 
   loadSong(songId) {
@@ -268,6 +271,33 @@ export class Sections {
     this._debouncedSave();
   }
 
+  // ── Private: auto-detect ──────────────────────────────────────────────────
+
+  async _autoDetect() {
+    if (!this._songId) return;
+    const btn = this._detectBtn;
+    if (btn) { btn.disabled = true; btn.textContent = 'Detecting…'; }
+
+    try {
+      const result = await this.API.detectSections(this._songId);
+      const sections = result?.sections || [];
+      if (!sections.length) {
+        alert('Section detection returned no results. Try installing allin1 on the backend: pip install allin1');
+        return;
+      }
+      this._sections = sections.map(s => ({ ...s }));
+      this.State.sections = this._sections.map(s => ({ ...s }));
+      this._dirty = false;   // server already persisted
+      this._render();
+      this._flashSaveIndicator('Detected');
+    } catch (err) {
+      console.error('[sections] auto-detect failed:', err);
+      alert(`Section detection failed: ${err.message}`);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Auto-detect'; }
+    }
+  }
+
   // ── Private: save ─────────────────────────────────────────────────────────
 
   _debouncedSave() {
@@ -287,9 +317,9 @@ export class Sections {
     }
   }
 
-  _flashSaveIndicator() {
+  _flashSaveIndicator(msg = 'Saved') {
     const el = this._saveInd; if (!el) return;
-    el.textContent = 'Saved'; el.classList.remove('hidden');
+    el.textContent = msg; el.classList.remove('hidden');
     setTimeout(() => el.classList.add('hidden'), 1600);
   }
 }

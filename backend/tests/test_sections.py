@@ -1,5 +1,14 @@
 """Tests for audio/sections.py"""
+import tempfile
+import time
+from pathlib import Path
+
+import numpy as np
 import pytest
+import soundfile as sf
+
+from audio import section_detection
+from audio.section_detection import _detect_with_librosa
 from audio.sections import normalize_sections, validate_sections, SECTION_COLORS, SECTION_NAMES
 
 
@@ -84,6 +93,51 @@ def test_all_known_kinds_accepted():
     raw = [{"start": i * 10, "end": (i + 1) * 10, "label": k} for i, k in enumerate(kinds)]
     out = normalize_sections(raw, duration=len(kinds) * 10.0)
     assert len(out) == len(kinds)
+
+
+def test_librosa_fallback_returns_segments_for_synthetic_track():
+    sr = 22050
+    dur = 24.0
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    left = np.sin(2 * np.pi * 220 * t)
+    middle = np.sin(2 * np.pi * 330 * t)
+    right = np.sin(2 * np.pi * 440 * t)
+    y = np.concatenate([
+        left[: int(sr * 8)],
+        middle[int(sr * 8): int(sr * 16)],
+        right[int(sr * 16):],
+    ]).astype(np.float32)
+
+    with tempfile.TemporaryDirectory(prefix="mwtn-sections-") as tmpdir:
+        path = Path(tmpdir) / "synthetic.wav"
+        sf.write(path, y, sr)
+
+        sections = _detect_with_librosa(path, dur)
+
+    assert sections is not None
+    assert len(sections) >= 2
+    assert sections[0]["start"] == pytest.approx(0.0, abs=1.0)
+    assert sections[-1]["end"] >= dur - 1.0
+
+
+def test_allin1_timeout_falls_back_to_none(monkeypatch):
+    import sys
+    import types
+
+    def hung_analyze(path):
+        time.sleep(1.0)
+        return None
+
+    fake_module = types.SimpleNamespace(analyze=hung_analyze)
+    monkeypatch.setattr(section_detection, 'ALLIN1_TIMEOUT_SECONDS', 0.15, raising=False)
+    monkeypatch.setitem(sys.modules, 'allin1', fake_module)
+
+    start = time.monotonic()
+    result = section_detection._detect_with_allin1(Path('dummy.wav'), duration=30.0)
+    elapsed = time.monotonic() - start
+
+    assert result is None
+    assert elapsed < 0.5
 
 
 # ── validate_sections ──────────────────────────────────────────────────────

@@ -461,10 +461,19 @@ export class Studio {
 
     const clamp = v => Math.max(0, Math.min(1, v));
 
+    const getClientX = (e) => {
+      if (typeof e.clientX === 'number') return e.clientX;
+      if (e.touches && e.touches[0]) return e.touches[0].clientX;
+      if (e.changedTouches && e.changedTouches[0]) return e.changedTouches[0].clientX;
+      if (typeof e.pageX === 'number') return e.pageX;
+      return 0;
+    };
+
     const getFrac = (e) => {
       const rect = scrub.getBoundingClientRect();
-      const x    = e.touches ? e.touches[0].clientX : e.clientX;
-      return clamp((x - rect.left) / rect.width);
+      const x    = getClientX(e);
+      const width = rect.width || 1;
+      return clamp((x - rect.left) / width);
     };
 
     const applyFrac = (frac, commit = false) => {
@@ -482,31 +491,38 @@ export class Studio {
       if (commit) this.seek(time);
     };
 
-    // Mouse
-    scrub.addEventListener('mousedown', (e) => {
+    const beginScrub = (e) => {
       if (this.State.duration <= 0) return;
       dragging   = true;
       wasPlaying = this.State.isPlaying;
       if (wasPlaying) this.pause();
       applyFrac(getFrac(e));
       e.preventDefault();
-    });
+    };
 
-    document.addEventListener('mousemove', (e) => {
-      if (!dragging) return;
-      applyFrac(getFrac(e));
-    });
-
-    document.addEventListener('mouseup', (e) => {
+    const commitScrub = (e) => {
       if (!dragging) return;
       dragging = false;
       applyFrac(getFrac(e), true);
       if (tip) tip.style.display = 'none';
       if (wasPlaying) this.play();
+    };
+
+    scrub.addEventListener('pointerdown', beginScrub);
+    document.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      applyFrac(getFrac(e));
+    });
+    document.addEventListener('pointerup', commitScrub);
+    document.addEventListener('pointercancel', () => {
+      if (!dragging) return;
+      dragging = false;
+      if (tip) tip.style.display = 'none';
+      if (wasPlaying) this.play();
     });
 
     // Hover tooltip (not dragging)
-    scrub.addEventListener('mousemove', (e) => {
+    scrub.addEventListener('pointermove', (e) => {
       if (dragging || this.State.duration <= 0) return;
       const frac = getFrac(e);
       if (tip) {
@@ -515,30 +531,10 @@ export class Studio {
         tip.style.display = '';
       }
     });
-    scrub.addEventListener('mouseleave', () => {
+    scrub.addEventListener('pointerleave', () => {
       if (!dragging && tip) tip.style.display = 'none';
     });
 
-    // Touch
-    scrub.addEventListener('touchstart', (e) => {
-      if (this.State.duration <= 0) return;
-      dragging   = true;
-      wasPlaying = this.State.isPlaying;
-      if (wasPlaying) this.pause();
-      applyFrac(getFrac(e));
-      e.preventDefault();
-    }, { passive: false });
-
-    document.addEventListener('touchmove', (e) => {
-      if (!dragging) return;
-      applyFrac(getFrac(e));
-    }, { passive: true });
-
-    document.addEventListener('touchend', () => {
-      if (!dragging) return;
-      dragging = false;
-      if (wasPlaying) this.play();
-    });
 
     // Keyboard on the scrub (ARIA role=slider)
     scrub.addEventListener('keydown', (e) => {

@@ -225,6 +225,29 @@ export const API = {
     a.remove();
   },
 
+  // ── Vocal split ────────────────────────────────────────────────────────────
+
+  /**
+   * Trigger a second-pass vocal split on an already-separated song.
+   * Splits vocals.wav → lead_vocals.wav + backing_vocals.wav.
+   * Requires audio-separator[cpu] in the backend environment.
+   * Returns { new_stems: [...], log: [...] }
+   */
+  async triggerVocalSplit(songId) {
+    return _json(await fetch(`${BASE}/songs/${songId}/vocal-split`, { method: 'POST' }));
+  },
+
+  // ── Section detection ───────────────────────────────────────────────────────
+
+  /**
+   * Trigger automatic section detection using the allin1 ML model
+   * (falls back to librosa heuristic if allin1 is not installed).
+   * Returns { sections: [...], log: [...] }
+   */
+  async detectSections(songId) {
+    return _json(await fetch(`${BASE}/songs/${songId}/sections/detect`, { method: 'POST' }));
+  },
+
   // ── Setup ──────────────────────────────────────────────────────────────────
 
   async setupCheck() {

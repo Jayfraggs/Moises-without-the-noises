@@ -17,15 +17,16 @@
  */
  
 import { State }      from './state.js';
-import { API }        from '../../../backend/frontend/static/js/api.js';
-import { Catalog }    from '../../../backend/frontend/static/js/catalog.js';
+import { API }        from './api.js';
+import { Catalog }    from './catalog.js';
 import { Studio }     from './studio.js';
 import { Transport }  from './transport.js';
-import { Import }     from '../../../backend/frontend/static/js/import.js';
+import { Import }     from './import.js';
 import { Extract }    from './extract.js';
-import { Settings }   from '../../../backend/frontend/static/js/settings.js';
+import { Settings }   from './settings.js';
 import { SolfaPanel } from './solfa.js';
-import { BeatGrid }   from '../../../backend/frontend/static/js/beat-grid.js';
+import { LyricsPanel } from './lyrics.js';
+import { BeatGrid }   from './beat-grid.js';
 import { Sections }   from './sections.js';
 import { VuMeters }   from './vu-meters.js';
 
@@ -41,6 +42,7 @@ async function boot() {
   const extract    = new Extract({ API });
   const settings   = new Settings({ State, API, catalog });
   const solfaPanel = new SolfaPanel({ API });
+  const lyricsPanel = new LyricsPanel({ API });
   const beatGrid   = new BeatGrid({ State, API, studio });
   const sections   = new Sections({ State, API, studio });
   const vuMeters   = new VuMeters({ studio });
@@ -51,6 +53,7 @@ async function boot() {
 
   studio._onTick = (pos) => {
     solfaPanel.tick(pos);
+    lyricsPanel.tick(pos);
     beatGrid.tick(pos);
     sections.tick(pos);
   };
@@ -64,6 +67,7 @@ async function boot() {
   const _origLoad = studio.loadSong.bind(studio);
   studio.loadSong = async (songId) => {
     solfaPanel.clear();
+    lyricsPanel.clear();
     beatGrid.clear();
     sections.clear();
     vuMeters.stop();
@@ -72,15 +76,38 @@ async function boot() {
 
     beatGrid.loadSong(songId);
     sections.loadSong(songId);
+    lyricsPanel.loadSong(songId);
     vuMeters.rebuild();
     vuMeters.start();
     _updateExportPerStemPanel();
+    _updateVocalSplitUI();
 
     if (State.manifest?.stems?.includes('bass')) solfaPanel.loadSong(songId);
   };
 
+  function _updateVocalSplitUI() {
+    const stems = State.manifest?.stems || [];
+    const hasVocals       = stems.includes('vocals');
+    const hasLeadVocals   = stems.includes('lead_vocals');
+    const hasBackingVocals = stems.includes('backing_vocals');
+    const splitDone = hasLeadVocals || hasBackingVocals;
+
+    // Show/hide the trigger row
+    const splitRow = document.getElementById('vocalSplitRow');
+    if (splitRow) splitRow.classList.toggle('hidden', !hasVocals || splitDone);
+
+    // Show/hide the static lane stubs (studio will also render dynamic lanes)
+    document.querySelector('.lead_vocals')?.classList.toggle('hidden', !hasLeadVocals);
+    document.querySelector('.backing_vocals')?.classList.toggle('hidden', !hasBackingVocals);
+
+    // Reset status text on new song load
+    const status = document.getElementById('vocalSplitStatus');
+    if (status) status.textContent = '';
+  }
+
   // ── Solfège seek ─────────────────────────────────────────────────────────
   document.addEventListener('solfa:seek', (e) => studio.seek(e.detail.time));
+  document.addEventListener('lyrics:seek', (e) => studio.seek(e.detail.time));
 
   // ── Solfa panel collapse ─────────────────────────────────────────────────
   const solfaColBtn  = document.getElementById('solfaCollapseBtn');
@@ -90,6 +117,17 @@ async function boot() {
     solfaColBtn.setAttribute('aria-expanded', !expanded);
     if (solfaBody) solfaBody.style.display = expanded ? 'none' : '';
     const chevron = solfaColBtn.querySelector('polyline');
+    if (chevron) chevron.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
+  });
+
+  // ── Lyrics panel collapse ─────────────────────────────────────────────────
+  const lyricsColBtn = document.getElementById('lyricsCollapseBtn');
+  const lyricsBody   = document.getElementById('lyricsBody');
+  lyricsColBtn?.addEventListener('click', () => {
+    const expanded = lyricsColBtn.getAttribute('aria-expanded') === 'true';
+    lyricsColBtn.setAttribute('aria-expanded', !expanded);
+    if (lyricsBody) lyricsBody.style.display = expanded ? 'none' : '';
+    const chevron = lyricsColBtn.querySelector('polyline');
     if (chevron) chevron.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
   });
 
@@ -116,6 +154,30 @@ async function boot() {
 
   // ── Sections ─────────────────────────────────────────────────────────────
   sections.init();
+
+  // ── Vocal split ──────────────────────────────────────────────────────────
+  document.getElementById('vocalSplitBtn')?.addEventListener('click', async () => {
+    const songId = State.songId;
+    if (!songId) return;
+    const btn    = document.getElementById('vocalSplitBtn');
+    const status = document.getElementById('vocalSplitStatus');
+    if (btn) { btn.disabled = true; btn.textContent = 'Splitting…'; }
+    if (status) status.textContent = '';
+    try {
+      const result = await API.triggerVocalSplit(songId);
+      if (status) status.textContent = `✓ ${result.new_stems?.join(' + ') || 'Done'}`;
+      // Reload the song so new stems appear in the mixer
+      await studio.loadSong(songId);
+    } catch (err) {
+      if (status) status.textContent = `Failed: ${err.message}`;
+      console.error('[vocal-split]', err);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Split Lead / Backing Vocals';
+      }
+    }
+  });
 
   // ── Panel toggles (Analysis / Sections) ──────────────────────────────────
   document.querySelectorAll('.daw-panel-toggle').forEach(btn => {

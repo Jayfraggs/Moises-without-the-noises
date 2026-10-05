@@ -77,6 +77,8 @@ from audio.key_detection import detect_key
 from audio.pitch import pitch_shift_wav, time_stretch_wav
 from audio.waveform_scan import scan_stem
 from audio.sections import normalize_sections, validate_sections
+from audio.vocal_split import run_vocal_split
+from audio.section_detection import detect_sections
 from audio.collect import (
     compute_stem_peaks,
     compute_stem_presence,
@@ -212,22 +214,46 @@ def get_peaks(song_id: str):
     song_dir = DATA_DIR / song_id
     if not song_dir.exists():
         raise HTTPException(404, f"No song '{song_id}'")
+
     peaks_path = song_dir / "peaks.json"
     if peaks_path.exists():
-        return json.loads(peaks_path.read_text())
+        try:
+            data = json.loads(peaks_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if isinstance(data, dict) and data and any(
+            isinstance(value, list) and value and isinstance(value[0], (list, tuple))
+            for value in data.values()
+        ):
+            return data
+
     manifest_path = song_dir / "manifest.json"
     if not manifest_path.exists():
         raise HTTPException(404, f"No manifest for '{song_id}'")
-    manifest = json.loads(manifest_path.read_text())
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     stems = manifest.get("stems", [])
     if not stems:
         raise HTTPException(404, "No stems in manifest")
+
     try:
-        rms = compute_stem_peaks(song_dir, stems)
-        presence = compute_stem_presence(rms)
-        result = {"stems": rms, "presence": presence}
-        peaks_path.write_text(json.dumps(result))
-        return result
+        peaks: dict[str, list[list[float]]] = {}
+        for name in stems:
+            wav_path = song_dir / f"{name}.wav"
+            if not wav_path.exists():
+                continue
+            try:
+                result, _ = scan_stem(str(wav_path), 3000)
+            except Exception:
+                continue
+            if result:
+                peaks[name] = result
+        if not peaks:
+            raise HTTPException(404, f"No waveform peaks for '{song_id}'")
+        peaks_path.write_text(json.dumps(peaks), encoding="utf-8")
+        return peaks
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Peak computation failed: {e}")
 
@@ -463,12 +489,102 @@ def patch_sections(song_id: str, body: SectionsPatch):
         raise HTTPException(404, f"No song '{song_id}'")
     try:
         validated = validate_sections(body.sections)
-        normalized = normalize_sections(validated)
+        # normalize_sections requires duration; derive it from the sections themselves
+        duration = max((float(s.get("end", 0)) for s in validated if isinstance(s, dict)), default=0.0)
+        normalized = normalize_sections(validated, duration)
     except Exception as e:
         raise HTTPException(422, f"Invalid sections: {e}")
     p = song_dir / "sections.json"
     p.write_text(json.dumps(normalized, ensure_ascii=False), encoding="utf-8")
     return normalized
+
+
+# ── Sections: auto-detect ─────────────────────────────────────────────────────
+
+@app.post("/api/songs/{song_id}/sections/detect")
+def auto_detect_sections(song_id: str):
+    """
+    Run the allin1 ML model (or librosa heuristic fallback) to automatically
+    detect song structure sections and persist them to sections.json.
+
+    allin1 must be installed in the environment for the ML path:
+        pip install allin1
+    The librosa heuristic fallback works without any extra install.
+
+    Returns the normalised section list on success.
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+
+    log: list[str] = []
+    try:
+        sections = detect_sections(song_dir, report=log.append)
+    except Exception as exc:
+        raise HTTPException(500, f"Section detection failed: {exc}")
+
+    if not sections:
+        raise HTTPException(
+            422,
+            "Section detection produced no results. "
+            "Install allin1 for best results: pip install allin1"
+        )
+
+    _patch_manifest(song_dir, {"has_sections": True})
+    return {"sections": sections, "log": log}
+
+
+# ── Vocal split ───────────────────────────────────────────────────────────────
+
+@app.post("/api/songs/{song_id}/vocal-split")
+def vocal_split(song_id: str):
+    """
+    Second-pass vocal separation: splits the existing vocals.wav into
+    lead_vocals.wav and backing_vocals.wav using audio-separator's
+    UVR-BVE-4B_SN-44100-1 model.
+
+    Requires: pip install 'audio-separator[cpu]'
+    (~200 MB model downloaded on first use)
+
+    On success: updates the manifest and returns the new stem list.
+    """
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    if not (song_dir / "vocals.wav").exists():
+        raise HTTPException(404, f"No vocals.wav for '{song_id}' — run separation first")
+
+    log: list[str] = []
+    try:
+        stem_files = run_vocal_split(song_dir, report=log.append)
+    except Exception as exc:
+        raise HTTPException(500, f"Vocal split failed: {exc}")
+
+    if not stem_files:
+        raise HTTPException(
+            422,
+            "Vocal split produced no output. "
+            "Install audio-separator: pip install 'audio-separator[cpu]'"
+        )
+
+    # Update manifest with new stems
+    manifest_path = song_dir / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        stems = manifest.get("stems", [])
+        for new_stem in stem_files:
+            if new_stem not in stems:
+                stems.append(new_stem)
+        manifest["stems"] = stems
+        manifest["has_vocal_split"] = True
+        tmp = manifest_path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(manifest_path)
+
+    return {
+        "new_stems": list(stem_files.keys()),
+        "log": log,
+    }
 
 
 # ── Analysis: notes ───────────────────────────────────────────────────────────
@@ -755,6 +871,16 @@ def _run_import(job_id: str, input_path: Path, song_id: str, model_name: str):
                 prog("Whisper not installed — skipping lyrics (pip install openai-whisper to enable)")
             except Exception as e:
                 prog(f"Whisper transcription failed (non-fatal): {e}")
+
+        # Section detection (optional — requires allin1 or degrades to librosa heuristic)
+        prog("Detecting song sections…")
+        try:
+            sections = detect_sections(song_dir, report=prog)
+            if sections:
+                manifest["has_sections"] = True
+                prog(f"Sections: {len(sections)} detected")
+        except Exception as e:
+            prog(f"Section detection failed (non-fatal): {e}")
 
         (song_dir / "manifest.json").write_text(json.dumps(manifest))
         import_jobs[job_id]["state"] = "done"
