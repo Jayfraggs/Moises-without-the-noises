@@ -5132,24 +5132,39 @@ input, textarea { font-family: inherit; }
   align-items: center;
   gap: 3px;
   padding: 0 14px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  overflow: hidden;
   flex: 1;
   min-width: 0;
   height: 100%;
 }
-.solfa-grid::-webkit-scrollbar { height: 4px; }
-.solfa-grid::-webkit-scrollbar-track { background: transparent; }
-.solfa-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.solfa-timeline-track {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: max-content;
+  min-height: 56px;
+  padding: 0 14px;
+  will-change: transform;
+}
+
+.solfa-rest-gap,
+.solfa-cell.solfa-cell-rest {
+  align-self: center;
+  min-height: 18px;
+  border: 0;
+  border-top: 2px dotted var(--muted-2);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.solfa-cell.solfa-cell-rest.active { border-top-color: var(--accent); }
 
 /* Individual syllable cell */
 .solfa-cell {
   flex-shrink: 0;
   height: 56px;
-  border-radius: 7px;
+  border-radius: 4px;
   background: var(--panel);
   border: 1px solid var(--border);
   display: flex;
@@ -5160,7 +5175,7 @@ input, textarea { font-family: inherit; }
   padding: 4px 6px;
   cursor: pointer;
   position: relative;
-  transition: background 0.08s, border-color 0.08s, transform 0.08s;
+  transition: background 0.08s, border-color 0.08s, transform 0.08s, color 0.08s;
   user-select: none;
   overflow: hidden;
 }
@@ -5181,8 +5196,8 @@ input, textarea { font-family: inherit; }
   transform: translateY(-1px);
 }
 .solfa-cell.active {
-  background: color-mix(in srgb, var(--solfa-color, var(--accent)) 14%, var(--panel));
-  border-color: color-mix(in srgb, var(--solfa-color, var(--accent)) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
@@ -5201,7 +5216,8 @@ input, textarea { font-family: inherit; }
 
 /* Main syllable text */
 .solfa-syl {
-  font-size: 15px;
+  color: var(--muted);
+  font-size: 13px;
   font-weight: 800;
   font-family: var(--font-mono);
   line-height: 1;
@@ -5209,6 +5225,7 @@ input, textarea { font-family: inherit; }
   /* color set via JS via --solfa-color */
   transition: color 0.08s;
 }
+.solfa-cell.active .solfa-syl { color: var(--accent); font-size: 17px; }
 
 /* Pitch name below syllable */
 .solfa-pitch {

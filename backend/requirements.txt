@@ -7,6 +7,7 @@
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.12
+pyyaml>=6.0
 
 # Local ML / Audio — comment these in if using the local separation path.
 # NOTE: torch pin requires Python <=3.12. On Python 3.13+ use torch>=2.9.0.

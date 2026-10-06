@@ -44,18 +44,38 @@ if (-not (Test-Path ".\frontend\static\index.html")) {
 
 Write-Host "Frontend : OK" -ForegroundColor Green
 
+# ── Clear stale port 8000 listener (Windows bind fix) ───────────────────────
+
+$staleListeners = @(Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty OwningProcess -Unique |
+    Where-Object { $_ -gt 0 })
+
+if ($staleListeners.Count -gt 0) {
+    Write-Host "Port 8000 is already in use; clearing stale listener(s)…" -ForegroundColor Yellow
+    foreach ($processId in $staleListeners) {
+        try {
+            Stop-Process -Id $processId -Force -ErrorAction Stop
+            Write-Host "  Stopped PID $processId" -ForegroundColor Yellow
+        } catch {
+            Write-Host "  Could not stop PID $processId; it may have already exited." -ForegroundColor Yellow
+        }
+    }
+    Start-Sleep -Seconds 1
+}
+
 # ── Start backend ─────────────────────────────────────────────────────────────
 
 Write-Host "Starting mwtn backend…" -ForegroundColor Cyan
 
 $activatePath = (Resolve-Path $venvActivate).Path
-$backendPath  = (Resolve-Path ".\backend").Path
+$repoRoot     = (Resolve-Path ".").Path
 
 $backendCmd = `
   "`$host.UI.RawUI.WindowTitle = 'mwtn backend'; " + `
   "& '$activatePath'; " + `
-  "Set-Location '$backendPath'; " + `
-  "uvicorn main:app --host 127.0.0.1 --port 8000"
+  "Set-Location '$repoRoot'; " + `
+  "`$env:PYTHONPATH = '$repoRoot'; " + `
+  "uvicorn backend.main:app --host 127.0.0.1 --port 8000"
 
 $backendProc = Start-Process powershell `
     -ArgumentList "-NoExit", "-Command", $backendCmd `
@@ -91,31 +111,48 @@ if ($up) {
     Write-Host "           Check the 'mwtn backend' window for errors." -ForegroundColor Yellow
 }
 
+Start-Sleep -Seconds 2
+Write-Host ""
+Write-Host "--- MWTN Health Check ---" -ForegroundColor Cyan
+try {
+    $health = Invoke-RestMethod -Uri "http://localhost:8000/api/health" -TimeoutSec 5
+    Write-Host ("  Backend:    {0}" -f $health.status.ToUpper()) -ForegroundColor Green
+    foreach ($check in $health.checks.PSObject.Properties) {
+        $st = $check.Value.status
+        $color = if ($st -eq "ok") { "Green" } elseif ($st -eq "not_installed") { "DarkGray" } else { "Yellow" }
+        Write-Host ("  {0,-20} {1}" -f $check.Name, $st) -ForegroundColor $color
+    }
+} catch {
+    Write-Host "  Could not reach backend health endpoint." -ForegroundColor Yellow
+    Write-Host "  Backend may still be starting up." -ForegroundColor DarkGray
+}
+Write-Host "-------------------------" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Mobile data tip: Heavy processing runs on Google Colab, not locally." -ForegroundColor DarkCyan
+Write-Host "   Only upload/download costs apply (~60-200 MB per song via Colab)." -ForegroundColor DarkGray
+Write-Host ""
+
 # ── Launch app ────────────────────────────────────────────────────────────────
 
-$electronReady = (Test-Path ".\electron\node_modules") -and (Test-Path ".\electron\package.json")
+$electronExe = Join-Path $PSScriptRoot "electron\node_modules\.bin\electron.cmd"
 
-if ($electronReady) {
-    Write-Host "Launching Electron…" -ForegroundColor Cyan
-    Push-Location electron
+if (Test-Path $electronExe) {
+    Write-Host "Launching Electron shell..." -ForegroundColor Cyan
+    $electronProc = Start-Process -FilePath $electronExe -ArgumentList "." -WorkingDirectory (Join-Path $PSScriptRoot "electron") -PassThru
     try {
-        cmd /c npm start
+        Wait-Process -Id $electronProc.Id -ErrorAction SilentlyContinue
     } finally {
-        Pop-Location
-        Write-Host ""
-        Write-Host "Electron closed. Stopping backend…" -ForegroundColor Cyan
         if ($backendProc -and -not $backendProc.HasExited) {
             Stop-Process -Id $backendProc.Id -Force -ErrorAction SilentlyContinue
         }
-        Write-Host "mwtn stopped." -ForegroundColor Green
     }
 } else {
     Write-Host ""
-    Write-Host "Electron not installed — opening in your default browser." -ForegroundColor Yellow
-    Write-Host "App URL : http://127.0.0.1:8000" -ForegroundColor Cyan
+    Write-Host "Electron not built - opening browser UI instead." -ForegroundColor DarkGray
+    Write-Host "App URL : http://localhost:5173" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "Press Ctrl+C here to stop the backend when you're done." -ForegroundColor Yellow
+    Write-Host 'Press Ctrl+C here to stop the backend when you are done.' -ForegroundColor Yellow
     Write-Host ""
-    try { Start-Process "http://127.0.0.1:8000" } catch { }
-    try { Wait-Process -Id $backendProc.Id } catch { }
+    Start-Process "http://localhost:5173" -ErrorAction SilentlyContinue
+    try { Wait-Process -Id $backendProc.Id -ErrorAction SilentlyContinue } catch { }
 }

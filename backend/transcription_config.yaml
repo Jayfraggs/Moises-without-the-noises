@@ -1,0 +1,51 @@
+# MWTN Transcription Engine Configuration
+# ----------------------------------------
+# Controls which AMT engines are active and their thresholds.
+# All heavy ML runs on Google Colab — see colab/mwtn_notebook.ipynb.
+# Restart the backend after changing this file.
+
+# --- Enabled engines ---
+# Basic Pitch and pYIN are always available (no extra install needed for pYIN).
+# Set to false to disable an engine (e.g. if you hit Colab memory limits).
+engines:
+  pyin:        { enabled: true }                  # pYIN is built on librosa and is available by default.
+  basic_pitch: { enabled: true }                  # Basic Pitch is the default polyphonic engine for most stems.
+  piano_kong:  { enabled: false }                # High quality piano. ~350 MB first-run. Set true to activate.
+  adtlib:      { enabled: false }                # Drum transcription. ~30 MB. Set true to activate.
+  mt3:         { enabled: false }                # NOT IMPLEMENTED IN V1. Deferred to v2.
+
+# --- Quality profiles per stem ---
+# "fast"         → fastest available engine (pYIN for vocals/bass; Basic Pitch elsewhere)
+# "standard"     → recommended default (Basic Pitch for all polyphonic stems)
+# "high_quality" → best available engine per stem (Piano Kong for piano if enabled)
+default_profiles:
+  vocals:  fast        # pYIN is sufficient and fast for monophonic vocal melodies
+  bass:    fast        # pYIN is sufficient for bass lines
+  piano:   standard    # Change to high_quality to use Piano Kong (requires piano_kong: enabled: true)
+  guitar:  standard    # NOTE: guitar AMT quality is low for ALL open-source models. Expect manual review.
+  drums:   standard    # Requires adtlib: enabled: true for drum-specific transcription
+  other:   standard    # Default fallback profile for non-key stems
+
+# --- Post-processing thresholds ---
+postprocessing:
+  minimum_confidence: 0.30       # Drop notes below this confidence [0.0–1.0]
+  minimum_note_length_ms: 50.0   # Drop notes shorter than this (milliseconds)
+
+# --- Basic Pitch thresholds ---
+# Lower onset_threshold → more notes detected (more false positives)
+# Higher onset_threshold → fewer notes (more misses)
+basic_pitch:
+  onset_threshold: 0.50         # Basic Pitch onset sensitivity; lower is more aggressive.
+  frame_threshold: 0.30          # Frame threshold for note acceptance; lower is more permissive.
+  minimum_frequency_hz: 32.7     # C1 — lowest note to detect
+  maximum_frequency_hz: 2093.0   # C7 — highest note to detect
+
+# --- Chunking ---
+# Long audio is split into overlapping chunks to prevent memory issues.
+chunking:
+  chunk_duration_s: 60.0         # Each chunk is this many seconds
+  chunk_overlap_s: 2.0           # Overlap between adjacent chunks (for clean merging)
+
+# --- Hardware ---
+device: cpu                     # "cpu" or "cuda". Use "cuda" only if running locally with a GPU.
+                                # Colab handles GPU automatically; leave this as "cpu" for Colab use.

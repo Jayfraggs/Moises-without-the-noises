@@ -82,7 +82,7 @@ async function boot() {
     _updateExportPerStemPanel();
     _updateVocalSplitUI();
 
-    if (State.manifest?.stems?.includes('bass')) solfaPanel.loadSong(songId);
+    if (State.manifest?.stems?.includes('bass')) solfaPanel.loadSong(songId, 'bass');
   };
 
   function _updateVocalSplitUI() {

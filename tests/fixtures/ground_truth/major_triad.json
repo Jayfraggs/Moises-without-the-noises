@@ -1,0 +1,16 @@
+{
+  "file": "major_triad.wav",
+  "expected_notes": [
+    {
+      "midi_pitch": 60
+    },
+    {
+      "midi_pitch": 64
+    },
+    {
+      "midi_pitch": 67
+    }
+  ],
+  "note_count": 3,
+  "polyphonic": true
+}

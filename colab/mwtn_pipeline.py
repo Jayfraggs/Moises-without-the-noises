@@ -468,6 +468,72 @@ def normalize_sections_simple(raw: list, duration: float) -> list:
     return sections
 
 
+def write_solfa_files(output_dir: Path, song_id: str) -> list[str]:
+    """Write idempotent movable-do solfège payloads for available pitched stems."""
+    major_solfa = ("Do", "Ra", "Re", "Me", "Mi", "Fa", "Se", "Sol", "Le", "La", "Te", "Ti")
+    pitch_classes = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    flat_aliases = {"Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#"}
+    key_path = output_dir / "key.json"
+
+    if not key_path.exists():
+        print("Solfa: key.json missing, skipping solfa generation.")
+        return []
+
+    key_data = json.loads(key_path.read_text(encoding="utf-8"))
+    root = str(key_data.get("root") or str(key_data.get("key", "C")).split()[0]).capitalize()
+    tonic_name = flat_aliases.get(root, root)
+    if tonic_name not in pitch_classes:
+        tonic_name = "C"
+    tonic_midi = 60 + pitch_classes.index(tonic_name)
+    mode_value = str(key_data.get("mode") or key_data.get("scale") or key_data.get("key") or "major").lower()
+    mode = "minor" if "min" in mode_value else "major"
+
+    written_stems: list[str] = []
+    for stem_name in ("vocals", "bass", "guitar", "piano"):
+        notes_path = output_dir / f"notes_{stem_name}.json"
+        if not notes_path.exists():
+            print(f"Solfa: {stem_name} skipped (notes file missing).")
+            continue
+
+        events: list[dict] = []
+        for note in json.loads(notes_path.read_text(encoding="utf-8")):
+            onset_s = float(note.get("start_time", note.get("start", note.get("time", 0.0))))
+            end_s = float(note.get("end_time", note.get("end", onset_s + note.get("duration", 0.0))))
+            pitch_midi = note.get("midi_pitch", note.get("midi"))
+            pitch_midi = int(pitch_midi) if pitch_midi is not None else None
+            if pitch_midi in (None, 0):
+                solfa = None
+            else:
+                degree = (pitch_midi - tonic_midi) % 12
+                if mode == "minor":
+                    degree = (degree + 9) % 12  # La-based minor
+                solfa = major_solfa[degree]
+            events.append({
+                "onset_s": onset_s,
+                "duration_s": max(0.0, end_s - onset_s),
+                "pitch_midi": pitch_midi,
+                "pitch_hz": note.get("frequency_hz", note.get("pitch_hz")),
+                "solfa": solfa,
+                "confidence": float(note.get("confidence", 1.0)),
+            })
+
+        payload = {
+            "song_id": song_id,
+            "stem": stem_name,
+            "tonic": tonic_name,
+            "tonic_midi": tonic_midi,
+            "mode": mode,
+            "events": events,
+        }
+        (output_dir / f"solfa_{stem_name}.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        written_stems.append(stem_name)
+        print(f"Solfa: wrote solfa_{stem_name}.json ({len(events)} events).")
+
+    return written_stems
+
+
 def build_output(
     song_id: str,
     input_path: Path,
@@ -516,6 +582,9 @@ def build_output(
         (output_dir / f'notes_{instrument}.json').write_text(json.dumps(timeline))
         notes_available.append(instrument)
         print(f'Wrote notes_{instrument}.json ({len(timeline)} segments)')
+
+    # Pure transformation: no additional download or model inference required.
+    write_solfa_files(output_dir, song_id)
 
     # ── Vocal split stems ─────────────────────────────────────────────────────
     has_vocal_split = False

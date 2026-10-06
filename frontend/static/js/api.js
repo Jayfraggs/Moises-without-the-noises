@@ -119,6 +119,12 @@ export const API = {
     return res.json();
   },
 
+  async getStemSolfa(songId, stemName) {
+    return _json(await fetch(
+      `${BASE}/songs/${encodeURIComponent(songId)}/stems/${encodeURIComponent(stemName)}/solfa`,
+    ));
+  },
+
   async computeSolfa(songId) {
     const res = await fetch(`${BASE}/songs/${songId}/solfa`, { method: 'POST' });
     if (!res.ok) {

@@ -73,6 +73,31 @@ def _make_song(data_dir: Path, song_id: str, stems=("vocals", "drums")) -> Path:
     return d
 
 
+def test_get_stem_solfa_computes_and_caches_payload(client, data_dir):
+    song_dir = _make_song(data_dir, "solfa_song")
+    (song_dir / "notes_vocals.json").write_text(json.dumps([
+        {"start": 0.5, "end": 0.75, "midi": 64, "confidence": 0.91},
+    ]))
+
+    response = client.get("/api/songs/solfa_song/stems/vocals/solfa")
+
+    assert response.status_code == 200
+    assert response.json()["tonic"] == "C"
+    assert response.json()["events"] == [{
+        "onset_s": 0.5, "duration_s": 0.25, "pitch_midi": 64,
+        "pitch_hz": None, "solfa": "Mi", "confidence": 0.91,
+    }]
+    assert (song_dir / "solfa_vocals.json").exists()
+
+
+def test_get_stem_solfa_requires_notes_and_key(client, data_dir):
+    _make_song(data_dir, "missing_solfa")
+
+    response = client.get("/api/songs/missing_solfa/stems/vocals/solfa")
+
+    assert response.status_code == 404
+
+
 # ── GET /api/songs ──────────────────────────────────────────────────────────
 
 def test_list_songs_empty(client):
@@ -186,6 +211,20 @@ def test_get_key_cached(client, data_dir):
     assert "key" in r.json()
 
 
+def test_get_stem_presence_computes_from_song_dir(client, data_dir):
+    _make_song(data_dir, "song_presence")
+    song_dir = data_dir / "song_presence"
+    manifest = json.loads((song_dir / "manifest.json").read_text())
+    manifest.pop("stem_presence", None)
+    (song_dir / "manifest.json").write_text(json.dumps(manifest))
+
+    r = client.get("/api/songs/song_presence/stem_presence")
+    assert r.status_code == 200
+    body = r.json()
+    assert "vocals" in body
+    assert "drums" in body
+
+
 # ── GET /api/songs/{id}/stems/{name}/waveform ────────────────────────────────
 
 def test_get_waveform(client, data_dir):
@@ -238,6 +277,49 @@ def test_patch_sections_invalid(client, data_dir):
     _make_song(data_dir, "song_i")
     r = client.patch("/api/songs/song_i/sections", json={"sections": []})
     assert r.status_code == 422
+
+
+# ── Solfa contract ────────────────────────────────────────────────────────────
+
+def test_get_solfa_returns_frontend_payload(client, data_dir):
+    _make_song(data_dir, "song_solfa")
+    song_dir = data_dir / "song_solfa"
+    payload = {
+        "key": "G# major",
+        "scale": "Major",
+        "root": "G#",
+        "events": [
+            {"time": 0.0, "duration": 1.0, "pitch": "G#2", "midi": 44, "solfa": "Do", "octave": 2},
+            {"time": 1.0, "duration": 1.0, "pitch": "A#2", "midi": 46, "solfa": "Re", "octave": 2},
+        ],
+    }
+    (song_dir / "solfa.json").write_text(json.dumps(payload))
+
+    r = client.get("/api/songs/song_solfa/solfa")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["root"] == "G#"
+    assert body["events"][0]["solfa"] == "Do"
+
+
+def test_sections_detect_endpoint_returns_sections(client, data_dir):
+    song_id = "song_sections_detect"
+    song_dir = _make_song(data_dir, song_id, stems=("bass", "vocals"))
+
+    # Build a 12-second wav stub so the heuristic path has valid duration.
+    with wave.open(str(song_dir / "bass.wav"), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(22050)
+        frames = b"\x00\x00" * (22050 * 12)
+        w.writeframes(frames)
+
+    r = client.post(f"/api/songs/{song_id}/sections/detect")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "sections" in body
+    assert len(body["sections"]) >= 2
+    assert body["sections"][0]["start"] == 0.0
 
 
 # ── GET /api/config ──────────────────────────────────────────────────────────

@@ -331,3 +331,40 @@ the same Settings panel to import the new song.
 - `frontend/src/components/DriveConfigFields.jsx` — hint updated to reference notebook variable name
 - `frontend/src/components/ImportSong.jsx` — reads saved model from Electron config on mount
 - `frontend/src/App.css` — Settings section styles
+## Notebook integration
+
+- 2026-10-06: Added madmom installation and beat/meter-analysis cells to `colab/mwtn_notebook.ipynb`; the legacy librosa cell is retained as a non-executing reference.
+
+## Tests
+
+- 2026-10-06: Added deterministic unit coverage for duration-to-tick conversion helpers.
+- 2026-10-06: Made duration lookup strict by default and preserved exact triplet matches over nearby dotted durations.
+- 2026-10-06: Added synthetic unit coverage for meter detection and beat-grid query behavior.
+- 2026-10-06: Added synthetic unit coverage for quantization, tuplets, rests, and measure validation.
+- 2026-10-06: Corrected humanized beat snapping and triplet classification for synthetic quantization cases.
+- 2026-10-06: Corrected triplet-group duration validation to span one complete beat.
+
+## Harmonic context
+
+- 2026-10-06: Added versioned harmonic key maps, enharmonic spelling, and legacy `key.json` migration.
+- 2026-10-06: Added optional-autochord and offline-librosa chord detection with beat-aligned cache artifacts.
+- 2026-10-06: Added non-breaking key-map, key-override, chord-detection, and chord-correction API routes; the existing cached `GET /chords` route is preserved.
+- 2026-10-06: Added focused harmonic-context and API test coverage; direct smoke tests pass while this virtual environment lacks pytest.
+- 2026-10-06: Added Colab harmonic-analysis cells for autochord installation, time-varying key maps, and beat-aligned chord detection.
+- 2026-10-06: Added React HarmonicAnalysis components for synchronized key display, chord timeline, overrides, loading, and error states.
+- 2026-10-06: Updated PowerShell startup scripts with required/optional dependency diagnostics, transcription-config validation, backend health reporting, mobile-data guidance, and Electron/browser fallback handling.
+- 2026-10-06: Added pure unit coverage for harmonic pitch mapping, enharmonic spelling, scales, chromatic checks, key-map ranges, serialization, round-trips, and legacy cache migration.
+- 2026-10-06: Added chord-detection unit tests and harmonic-pipeline integration tests covering parsing, merging, beat alignment, key-map caching, librosa fallback, and chord cache writes.
+
+## Solfa
+
+- 2026-10-06: Added a dependency-free movable-do solfège resolver and extended the canonical musical-event contract with optional solfège metadata.
+- 2026-10-06: Added a cached, stem-level solfège API endpoint with legacy note/key artifact compatibility.
+- 2026-10-06: Updated the active static solfège lane to consume stem-level results, render rests, and center the active event with a CSS transform.
+- 2026-10-06: Added idempotent Colab solfège artifact generation to the pipeline and notebook before output packaging.
+- 2026-10-06: Repaired activate.ps1 encoding and verified PowerShell parsing.
+- 2026-10-06: Fixed run.ps1 port cleanup loop by renaming the `$pid` variable to avoid PowerShell's read-only `$PID` automatic variable.
+- 2026-10-06: Hardened Colab notebook Cell 7 to locate the mwtn repository before importing backend beat-tracking code, with an actionable missing-source error.
+- 2026-10-06: Fixed Colab harmonic-analysis cells to reuse dynamic repository discovery and avoid hardcoded /content/mwtn audio/cache paths.
+- 2026-10-06: Repaired malformed Colab output-assembly Cell 10 source that had been split into one-character strings, causing an unterminated-string SyntaxError.
+- 2026-10-06: Repaired widespread mojibake in colab/mwtn_notebook.ipynb by restoring UTF-8 text and validated the notebook JSON.

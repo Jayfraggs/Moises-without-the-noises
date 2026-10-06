@@ -1,0 +1,12 @@
+AUDIO_TIME_UNIT = "seconds"  # Audio time values are floats in seconds from audio start.
+MIDI_PITCH_MIN = 0  # MIDI pitch values are ints in the inclusive range [0, 127].
+MIDI_PITCH_MAX = 127  # MIDI pitch values are ints in the inclusive range [0, 127].
+FREQUENCY_UNIT = "hz"  # Raw frequency values are floats in Hz.
+TEMPO_UNIT = "bpm"  # Tempo values are floats in beats-per-minute.
+CONFIDENCE_MIN = 0.0  # Confidence values are floats in the inclusive range [0.0, 1.0].
+CONFIDENCE_MAX = 1.0  # Confidence values are floats in the inclusive range [0.0, 1.0].
+MIDI_PPQ = 480  # MIDI export ticks per quarter note.
+SCHEMA_VERSION = "1.0"  # Current backend schema version string used as default model metadata.
+SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("1.0",)  # Backend-supported schema versions for reading existing data.
+STEM_ROLES: tuple[str, ...] = ("vocals", "bass", "drums", "guitar", "piano", "other")  # Canonical stem names across the backend.
+EVENT_TYPES: tuple[str, ...] = ("note", "rest", "chord", "drum_hit", "lyric", "beat", "key", "downbeat", "section")  # Valid event type strings in musical data payloads.

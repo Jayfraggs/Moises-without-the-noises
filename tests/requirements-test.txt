@@ -1,0 +1,15 @@
+# Test-only dependencies — do not add to backend/requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27          # FastAPI test client
+numpy>=1.24          # already in backend; listed here for clarity
+soundfile>=0.12      # already in backend
+mir_eval>=0.7        # musical accuracy metrics — test only, ~5 MB install
+pyyaml>=6.0          # already in backend after Plan 02-H
+
+# Optional — install manually to run Basic Pitch tests:
+# basic-pitch>=0.3.1
+# Optional — install manually to run Piano Kong tests:
+# piano-transcription-inference>=1.0.0
+# Optional — install manually to run ADTLib tests:
+# adtlib

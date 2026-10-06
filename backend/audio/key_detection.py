@@ -29,6 +29,32 @@ _PITCHES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 _MINOR_TIE_BREAK_FRAC = 0.05
 
 
+def _key_map_fields(key: str | None, confidence: int | float | None) -> dict:
+    """Create additive v2 key-map fields without changing the legacy payload."""
+    try:
+        # harmonic_context imports this module's chroma scorer, so importing it
+        # after module initialization avoids a circular import.
+        try:
+            from backend.audio.harmonic_context import KeyMap, get_key_preference, note_name_to_pitch_class
+        except ModuleNotFoundError:  # pragma: no cover - legacy backend entry point
+            from audio.harmonic_context import KeyMap, get_key_preference, note_name_to_pitch_class
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("detected key is empty")
+        parts = key.rsplit(" ", 1)
+        tonic = parts[0]
+        mode = "minor" if len(parts) == 2 and "min" in parts[1].lower() else "major"
+        note_name_to_pitch_class(tonic)
+        get_key_preference(tonic)
+        normalized_confidence = float(confidence or 0.0)
+        if normalized_confidence > 1.0:
+            normalized_confidence /= 100.0
+        key_map = KeyMap.from_single_key(tonic, mode, normalized_confidence)
+    except (TypeError, ValueError) as exc:
+        logger.warning("Could not construct key map from key %r: %s", key, exc)
+        key_map = KeyMap.from_single_key("C", "major", 0.0)
+    return {"key_map": key_map.to_dict()["key_map"], "schema_version": "2.0"}
+
+
 def _correlate(profile: tuple, chroma: list[float], shift: int) -> float:
     n = len(profile)
     rotated = [chroma[(i + shift) % n] for i in range(n)]
@@ -138,6 +164,8 @@ def detect_key(audio_path: str) -> dict:
           "key":           str,         # e.g. "A min"
           "scale":         str,         # "Natural Minor" or "Major"
           "key_confidence": int,        # 0-100
+          "key_map":       list[dict], # additive v2 harmonic contexts
+          "schema_version": str,        # additive key-map schema version
           "lufs":          float|None,
           "peak_db":       float|None,
           "dynamic_range": float|None,
@@ -148,7 +176,8 @@ def detect_key(audio_path: str) -> dict:
     except ImportError:
         logger.warning("librosa not available — key detection skipped")
         return {"key": None, "scale": None, "key_confidence": None,
-                "lufs": None, "peak_db": None, "dynamic_range": None}
+                "lufs": None, "peak_db": None, "dynamic_range": None,
+                **_key_map_fields(None, None)}
 
     loaded = _load_audio_ffmpeg(audio_path, sr=22050, duration=180.0)
     if loaded is None:
@@ -158,7 +187,8 @@ def detect_key(audio_path: str) -> dict:
         except Exception as e:
             logger.warning("key_detection: librosa.load also failed: %s", e)
             return {"key": None, "scale": None, "key_confidence": None,
-                    "lufs": None, "peak_db": None, "dynamic_range": None}
+                    "lufs": None, "peak_db": None, "dynamic_range": None,
+                    **_key_map_fields(None, None)}
     else:
         y, sr = loaded
 
@@ -184,8 +214,10 @@ def detect_key(audio_path: str) -> dict:
             "lufs": round(lufs, 1) if lufs is not None else None,
             "peak_db": round(peak_db, 1) if peak_db is not None else None,
             "dynamic_range": dynamic_range,
+            **_key_map_fields(key, confidence),
         }
     except Exception as e:
         logger.exception("key_detection failed for %s: %s", audio_path, e)
         return {"key": None, "scale": None, "key_confidence": None,
-                "lufs": None, "peak_db": None, "dynamic_range": None}
+                "lufs": None, "peak_db": None, "dynamic_range": None,
+                **_key_map_fields(None, None)}
