@@ -98,6 +98,7 @@ from backend.audio.chord_detection import load_or_detect_chords
 from backend.audio.meter import TimeSig, SUPPORTED_TIME_SIGNATURES
 from backend.audio.quantizer import quantize_events, QuantizationConfig
 from backend.schema.manifest import SongManifest
+from backend.jobs.notebook_generator import NotebookSettings, _render_params_cell, generate_notebook
 from backend.schema.events import NoteEvent
 from backend.schema.validation import validate_song_id, validate_manifest, load_json_safe
 from backend.schema.units import SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS
@@ -114,15 +115,15 @@ _TRANSCRIPTION_CFG: dict = {}
 if _TRANSCRIPTION_CONFIG_PATH.exists():
     with open(_TRANSCRIPTION_CONFIG_PATH, encoding="utf-8") as f:
         _TRANSCRIPTION_CFG = yaml.safe_load(f) or {}
-# Prefer the new vanilla JS static/ dir; fall back to legacy Vite dist/.
-_STATIC_DIR = BASE_DIR.parent / "frontend" / "static"
-_DIST_DIR   = BASE_DIR.parent / "frontend" / "dist"
-FRONTEND    = _STATIC_DIR if _STATIC_DIR.is_dir() else _DIST_DIR
+# The frontend is framework-free and served directly; no build step is needed.
+# Keep the served frontend aligned with run.ps1 and the packaged layout.
+FRONTEND = BASE_DIR.parent / "frontend" / "static"
 
 for d in (DATA_DIR, CACHE_DIR, IMPORT_TMP):
     d.mkdir(exist_ok=True)
 
 import_jobs: dict[str, dict] = {}
+notebook_jobs: dict[str, dict] = {}
 
 # ── Manifest helpers ──────────────────────────────────────────────────────────
 
@@ -177,6 +178,80 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class NotebookRequest(BaseModel):
+    song_title: str
+    source_url: str = ""
+    settings: dict = Field(default_factory=dict)
+
+
+def _notebook_settings(body: NotebookRequest, job_id: str) -> NotebookSettings:
+    values = dict(body.settings)
+    values.update(
+        job_id=job_id,
+        song_title=body.song_title,
+        source_url=body.source_url,
+        backend_url="",
+    )
+    return NotebookSettings(**values)
+
+
+def _song_title_slug(title: str) -> str:
+    slug = re.sub(r"\s+", "-", title.strip().lower())
+    slug = re.sub(r"[^a-z0-9-]", "", slug)
+    return (slug or "untitled")[:40].strip("-") or "untitled"
+
+
+def _notebook_error(job_id: str, exc: Exception) -> HTTPException:
+    notebook_jobs[job_id]["state"] = "error"
+    notebook_jobs[job_id]["error"] = str(exc)
+    return HTTPException(500, detail={"error": "notebook_generation_failed", "message": str(exc), "job_id": job_id})
+
+
+@app.post("/api/jobs/generate-notebook")
+async def generate_notebook_download(body: NotebookRequest):
+    job_id = str(uuid.uuid4())
+    notebook_jobs[job_id] = {"state": "queued", "song_title": body.song_title}
+    try:
+        notebook = await asyncio.to_thread(generate_notebook, _notebook_settings(body, job_id))
+    except Exception as exc:
+        raise _notebook_error(job_id, exc) from exc
+    filename = f"mwtn_{_song_title_slug(body.song_title)}_{job_id[:8]}.ipynb"
+    return Response(
+        content=notebook,
+        media_type="application/x-ipynb+json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "X-MWTN-Job-ID": job_id},
+    )
+
+
+@app.post("/api/jobs/generate-params-text")
+async def generate_params_text(body: NotebookRequest):
+    job_id = str(uuid.uuid4())
+    notebook_jobs[job_id] = {"state": "queued", "song_title": body.song_title}
+    try:
+        settings = _notebook_settings(body, job_id)
+        params_text = "".join(await asyncio.to_thread(_render_params_cell, settings))
+    except Exception as exc:
+        raise _notebook_error(job_id, exc) from exc
+    return {
+        "job_id": job_id,
+        "params_text": params_text,
+        "instructions": {
+            "colab": [
+                "Open colab/mwtn_notebook.ipynb in Google Colab.",
+                "Find the cell tagged 'parameters' (it has a yellow border in Colab).",
+                "Select all text in that cell and paste the copied parameters.",
+                "Fill in your BACKEND_URL (ngrok URL) in that cell.",
+                "Run all cells from top to bottom (Runtime → Run all).",
+            ],
+            "local": [
+                "Papermill will run the notebook automatically.",
+                f"Trigger via: POST /api/jobs/{job_id}/run-local",
+                "Or use the 'Run Locally' button in the app.",
+            ],
+        },
+    }
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -772,9 +847,9 @@ async def detect_song_chords(song_id: str, force: bool = False):
     song_id = validate_song_id(song_id)
     song_dir = DATA_DIR / song_id
     beats_path = song_dir / "beats.json"
-    if not beats_path.exists():
-        raise HTTPException(422, detail="Beat analysis required before chord detection")
     audio_path = _find_source_audio(song_dir)
+    # Chord detection can be requested directly from the UI. Build the beat
+    # grid on demand instead of forcing callers to know the analysis order.
     grid = load_or_analyze_beats(audio_path, beats_path)
     key_map = load_or_build_key_map(audio_path, song_dir / "key.json")
     chords = load_or_detect_chords(audio_path, song_dir / "chords.json", grid, key_map, force=force)
@@ -1733,4 +1808,4 @@ if FRONTEND.exists():
 else:
     @app.get("/")
     def _no_frontend():
-        return {"message": "Frontend not found. Expected: frontend/static/index.html"}
+        return {"message": "Frontend not found. Expected: frontend/index.html"}

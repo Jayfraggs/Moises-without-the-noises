@@ -1,5 +1,10 @@
 # Codebase Reference
 
+## Extract panel model selection
+
+- `frontend/js/ui/extractPanel.js`: loads `API.getConfig()` and renders only model-supported output stems.
+- `docs/features/extract-panel-user-guide.md`: user-facing explanation of each Extract & Analyse tab.
+
 ## Harmonic context
 
 `backend.audio.harmonic_context` provides a time-ranged `KeyMap` plus
@@ -53,3 +58,23 @@ output assembly step, so Colab ZIPs carry the same API-compatible solfège data.
 
 `activate.ps1` is the Windows setup entry point. It creates or repairs the venv,
 installs requirements, and uses ASCII-safe output for reliable PowerShell parsing.
+## 2026-10-06 — Vanilla frontend migration
+
+- `frontend/index.html`, `frontend/css/`, and `frontend/js/` are the direct-served frontend.
+- `frontend/js/main.js` loads the existing vanilla studio application.
+- `frontend/js/state/store.js` is the shared observable store for future UI modules.
+- FastAPI serves `frontend/` directly; no Vite build is required.
+- Harmonic analysis is rendered by `frontend/js/harmonic.js` into `#harmonicPanel` and styled by `frontend/css/harmonic.css`.
+- Chord detection builds missing beat analysis on demand; responsive layout overrides are in `frontend/css/responsive.css`.
+## Solfa colours (2026-10-06)
+
+- `frontend/js/utils/solfa.js`: shared `SOLFA_COLOURS`, `getSolfaColour`, and setting resolver.
+- `frontend/js/solfa.js`: applies shared colours to the active vanilla solfa timeline.
+
+## Notebook export generation (2026-10-06)
+
+- `backend/jobs/notebook_generator.py` defines `NotebookSettings` and `generate_notebook`.
+- The generator deep-copies `colab/mwtn_notebook.ipynb`, replaces only the cell tagged `parameters`, and returns UTF-8 notebook JSON bytes.
+- User-controlled strings are JSON-escaped as Python literals. `BACKEND_URL` remains blank for the user to fill in from Colab.
+- `POST /api/jobs/generate-notebook` returns the generated notebook download and `X-MWTN-Job-ID`; `POST /api/jobs/generate-params-text` returns clipboard-ready parameter source and setup instructions.
+- `frontend/js/ui/runPanel.js` owns the three-path notebook execution modal and job polling; `frontend/js/api.js` owns notebook/job requests.

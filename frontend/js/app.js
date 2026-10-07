@@ -31,6 +31,7 @@ import { VuMeters }   from './vu-meters.js';
 import { HarmonicPanel } from './harmonic.v2.js';
 import { initResizablePanels } from './resizablePanels.v3.js';
 import { initExtractPanel } from './ui/extractPanel.js';
+import './ui/runPanel.js';
 
 window._mwtn = { State, API };
 

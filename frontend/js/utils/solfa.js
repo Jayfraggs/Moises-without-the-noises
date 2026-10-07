@@ -1,0 +1,3 @@
+export const SOLFA_COLOURS = { Do:'var(--solfa-do)', Re:'var(--solfa-re)', Mi:'var(--solfa-mi)', Fa:'var(--solfa-fa)', Sol:'var(--solfa-sol)', La:'var(--solfa-la)', Ti:'var(--solfa-ti)', Ra:'var(--solfa-ra)', Me:'var(--solfa-me)', Se:'var(--solfa-se)', Le:'var(--solfa-le)', Te:'var(--solfa-te)' };
+export function getSolfaColour(syllable, fallback = 'var(--text-muted)') { const value = String(syllable || '').replace(/[0-9']/g, ''); return SOLFA_COLOURS[value[0]?.toUpperCase() + value.slice(1).toLowerCase()] ?? fallback; }
+export function solfaColoursEnabled(state = {}) { try { return state.solfa_colours ?? JSON.parse(localStorage.getItem('mwtn_extract_settings') || '{}').solfa_colours ?? true; } catch { return true; } }

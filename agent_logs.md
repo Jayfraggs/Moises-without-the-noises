@@ -368,3 +368,120 @@ the same Settings panel to import the new song.
 - 2026-10-06: Fixed Colab harmonic-analysis cells to reuse dynamic repository discovery and avoid hardcoded /content/mwtn audio/cache paths.
 - 2026-10-06: Repaired malformed Colab output-assembly Cell 10 source that had been split into one-character strings, causing an unterminated-string SyntaxError.
 - 2026-10-06: Repaired widespread mojibake in colab/mwtn_notebook.ipynb by restoring UTF-8 text and validated the notebook JSON.
+## 2026-10-06 — Frontend migration
+
+### Structure
+- Promoted the existing vanilla frontend from `frontend/static/` to `frontend/`.
+- Added native module entry point, observable store, and UI module extension points.
+
+### Backend
+- Changed FastAPI static serving to mount `frontend/` directly.
+
+### Verification
+- Confirmed the new entry point and store exist and retain ES-module syntax.
+
+## 2026-10-06 — Recovered harmonic panels
+
+### Feature
+- Replaced deleted React harmonic analysis panels with native DOM rendering.
+- Added key-map/chord detection API wrappers and playback-synchronized chord highlighting.
+- Added harmonic panel markup and scoped CSS.
+
+### Verification
+- `node --check` passed for the new harmonic module and modified API/app modules.
+
+## 2026-10-06 — Frontend encoding cleanup
+
+- Removed mojibake/non-ASCII corruption from `frontend/index.html` after the direct frontend copy.
+- Rewrote the file as UTF-8 without a BOM and verified no `â`, `Â`, or `Ã` markers remain.
+
+## 2026-10-06 — Browser runtime fixes
+
+- Fixed the harmonic chord-label expression that mixed nullish coalescing and logical OR without parentheses.
+- Replaced the non-standard vertical slider appearance with native vertical writing mode.
+- Added a local `frontend/favicon.svg` and linked it from the app shell.
+- Verified harmonic/app JavaScript syntax and favicon serving.
+
+## 2026-10-06 — User-resizable analysis panels
+
+- Added persistent drag handles for harmonic analysis, bass solfa, and lyrics panels.
+- Added keyboard resizing with arrow keys and double-click reset behavior.
+- Added responsive resize styling and preserved the harmonic handle across rerenders.
+
+## 2026-10-06 — Harmonic analysis and responsive UI
+
+### Backend
+- Removed the hard prerequisite for an existing `beats.json`; chord detection now builds beat analysis on demand.
+
+### Frontend
+- Added error handling for the harmonic Analyze action.
+- Added responsive breakpoints for sidebar, metadata panels, topbar, mixer, and mobile layouts.
+- Restored colorful bass solfa syllables using stable per-syllable color mapping.
+
+### Verification
+- Frontend harmonic and solfa modules pass `node --check`.
+- Python validation was unavailable because the environment could not launch `python.exe` or `py.exe`.
+## 2026-10-06 — Solfa colour restoration
+
+- Added shared solfa colour resolver and CSS variables.
+- Updated the active vanilla SolfaPanel to respect `solfa_colours`, including active brightness and live refresh events.
+- Loaded the persisted setting during app startup.
+## 2026-10-06 — Plan 12 UI stubs
+
+- Changed the extract panel's Colab action to an inline Plan 12 status message instead of throwing.
+- Kept Local CPU import available.
+- Routed mix/stem export buttons to the existing Studio export methods.
+- Added explicit status messaging for unavailable MIDI, MusicXML, and click-track exports.
+## 2026-10-06 — Frontend boot repair
+
+- Removed duplicate initialization of the legacy and rewritten extract panels.
+- Added the extract panel stylesheet to the actual served frontend entrypoint.
+## 2026-10-06 — Frontend duplicate archive
+
+- Moved the unused `frontend/static/` duplicate tree to `frontend/_archive/static-2026-10-06/`.
+- The active frontend remains under `frontend/index.html`, `frontend/js/`, and `frontend/css/`.
+- The archive is recoverable and contains 38 files.
+## 2026-10-06 — Restore packaged frontend layout
+
+- Restored `frontend/static/` from the archive after `run.ps1` reported it missing.
+- Copied the current frontend HTML, JavaScript, and CSS into `frontend/static/`.
+- Updated FastAPI static mounting to serve `frontend/static/`, matching the launcher and packaged project layout.
+## 2026-10-06 — Fix extract panel syntax error
+
+- Replaced the fragile nested one-line extract panel template with simpler pane builders.
+- Corrected missing array brackets in note-duration and confidence-threshold option lists.
+- Synchronized the corrected module into `frontend/static/js/ui/extractPanel.js`.
+- Validated both served and source modules as ES modules.
+## 2026-10-06 — Resizable panel startup guard
+
+- Guarded `clamp` and `addHandle` against missing panel elements.
+- Synchronized the fix to `frontend/static/js/resizablePanels.js`.
+- This prevents optional/missing panels from aborting the entire application boot.
+## 2026-10-06 — Force resizable module cache refresh
+
+- Confirmed HTTP served `resizablePanels.js` contains the null guard.
+- Added versioned `resizablePanels.v2.js` and changed the app import to bypass stale browser/Electron module cache.
+- Synchronized the versioned module and app entrypoint into `frontend/static/`.
+## 2026-10-06 — Resizable panel cache/runtime hardening
+
+- Confirmed the served v2 module still contained the failing `dataset` access.
+- Replaced panel dataset reads/writes with attribute access and added versioned `resizablePanels.v3.js`.
+- Updated the served app entrypoint to import v3, bypassing Electron/browser cache reuse.
+## 2026-10-06 — Fix resizable panel argument order
+
+- Corrected all `applyHeight` calls to pass `(panel, height)` as defined.
+- Synchronized the fix to the served v3 module and canonical frontend tree.
+## 2026-10-06 — Solfa, collapse, and playback layout
+
+- Applied shared syllable colours directly to bass solfa text, including active-note brightness.
+- Reworked lyrics and solfa collapse controls to use `hidden` and panel state classes.
+- Updated panel resizing to reserve transport and footer playback space.
+- Synchronized all changes into `frontend/static/`, the served frontend tree.
+## 2026-10-06 — Dynamic extraction model settings
+
+- Replaced hardcoded extraction model choices with the backend configuration catalogue.
+- Regenerate selectable stems from the selected model’s 2-, 4-, 5-, or 6-stem outputs.
+- Persist selected stems locally and added an Extract & Analyse end-user guide.
+- 2026-10-06 — Added `backend/jobs/notebook_generator.py` with `NotebookSettings`, strict parameters-cell lookup, JSON-safe string rendering, and immutable template generation for Colab exports.
+- 2026-10-06 — Added notebook download and parameter-text API routes to `backend/main.py`; routes create queued notebook jobs, generate in worker threads, slug filenames, and return structured generation failures.
+- 2026-10-06 — Added frontend Run Panel notebook flow, API client helpers, extract-panel wiring, polling tracker, clipboard fallback, and styling for Colab/local execution paths.

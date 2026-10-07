@@ -15,6 +15,19 @@ async function _json(res) {
 }
 
 export const API = {
+  async downloadNotebook(songTitle, sourceUrl, settings) {
+    const res = await fetch(`${BASE}/jobs/generate-notebook`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ song_title: songTitle, source_url: sourceUrl, settings }) });
+    if (!res.ok) { const error = await res.json().catch(() => ({})); throw new Error(error.detail?.message || error.detail || `HTTP ${res.status}`); }
+    return { blob: await res.blob(), jobId: res.headers.get('X-MWTN-Job-ID') };
+  },
+  async generateParamsText(songTitle, sourceUrl, settings) {
+    const res = await fetch(`${BASE}/jobs/generate-params-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ song_title: songTitle, source_url: sourceUrl, settings }) });
+    if (!res.ok) { const error = await res.json().catch(() => ({})); throw new Error(error.detail?.message || error.detail || `HTTP ${res.status}`); }
+    return res.json();
+  },
+  async getJob(jobId) { return _json(await fetch(`${BASE}/jobs/${encodeURIComponent(jobId)}`)); },
+  async runLocalJob(jobId) { return _json(await fetch(`${BASE}/jobs/${encodeURIComponent(jobId)}/run-local`, { method: 'POST' })); },
+  triggerBlobDownload(blob, jobId) { const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `mwtn_${jobId || 'notebook'}.ipynb`; document.body.append(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); },
   // ── Library ────────────────────────────────────────────────────────────────
 
   async listSongs() {
