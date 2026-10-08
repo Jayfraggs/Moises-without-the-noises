@@ -120,7 +120,8 @@ def detect_chords(audio_path: str | Path, grid: BeatGrid, key_map: KeyMap) -> li
         import autochord as autochord_module
         raw = detect_chords_autochord(audio_path)
         source_model = f"autochord_{getattr(autochord_module, '__version__', 'unknown')}"
-    except ImportError:
+    except Exception as error:
+        print(f"autochord unavailable ({error}); falling back to librosa chroma detection.")
         raw = detect_chords_librosa(audio_path)
         source_model = f"librosa_chroma_{librosa.__version__}"
     return align_chords_to_beat_grid(raw, grid, key_map, source_model)

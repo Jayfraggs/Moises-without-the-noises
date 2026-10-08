@@ -1,6 +1,21 @@
 # Agent Logs
 
 ## 2026-10-08
+### Fix Colab output cell source joining and Drive export
+- Corrected the notebook output cell's missing newline delimiters, which caused Jupyter to execute `import shutilimport json...` as one invalid line.
+- Preserved explicit ZIP delivery to `My Drive/mwtn_outputs/`.
+
+## 2026-10-08
+### Fix autochord Keras 3 fallback
+- Updated chord detection to catch autochord model-load/runtime failures, including Keras 3 SavedModel incompatibility errors.
+- Added an explicit fallback message and continued with librosa chroma detection instead of aborting the Colab pipeline.
+
+## 2026-10-08
+### Fix Colab Cell 8 key detection imports
+- Added explicit `librosa` and `numpy` imports to the notebook's key-detection cell.
+- Cell 8 no longer depends on state left by earlier cells or execution order.
+
+## 2026-10-08
 ### Fix fresh-Colab repository discovery
 - Updated `colab/mwtn_notebook.ipynb` Cell 7 to clone the public mwtn repository into `/content/mwtn` when the backend source tree is not already present.
 - Preserved reuse of an existing upload/clone and added a clear setup failure message if the clone cannot complete.
