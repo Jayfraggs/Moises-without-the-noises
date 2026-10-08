@@ -1,5 +1,33 @@
 # Agent Logs
 
+## 2026-10-08
+### Fix fresh-Colab repository discovery
+- Updated `colab/mwtn_notebook.ipynb` Cell 7 to clone the public mwtn repository into `/content/mwtn` when the backend source tree is not already present.
+- Preserved reuse of an existing upload/clone and added a clear setup failure message if the clone cannot complete.
+- The one-time source checkout is separate from model downloads; no additional pip installs were introduced.
+
+## 2026-10-08
+### Make Colab config copy control visible
+- Moved the selected-Colab-config copy button to the Extract panel footer so it remains visible regardless of the active tab or scroll position.
+- Renamed it to `Copy Selected Colab Config` and synchronized the served frontend mirror.
+
+## 2026-10-08
+### Restore served Run Panel module
+- Diagnosed the frontend/backend connection symptom as a static asset 404, not a backend API outage.
+- Copied `frontend/js/ui/runPanel.js` into `frontend/static/js/ui/runPanel.js`, matching the repository's source/served frontend mirror convention.
+- This restores the module imported by the Extract panel.
+
+## 2026-10-08
+### Restore Extract panel Colab config copy button
+- Restored the missing `Copy Colab Notebook Config` control in the active vanilla Extract panel.
+- Added clipboard copy with a textarea fallback and status feedback.
+- Synchronized the source and served frontend mirrors.
+
+## 2026-10-08
+### Fix FastAPI score export startup failure
+- Diagnosed `uvicorn` startup failure caused by FastAPI attempting to build a Pydantic response model from `FileResponse | JSONResponse` annotations on the MIDI and MusicXML export routes.
+- Added `response_model=None` to both route decorators, preserving mixed file/JSON response behavior while disabling invalid response-model inference.
+
 ## 2026-09-24
 ### Fix torch Version Pin for Python 3.14 (TASK-002)
 - Replaced `torch==2.4.1` with `torch==2.9.1+cpu` in `backend/requirements.txt` to ensure compatibility with Python 3.14 on CPU.
@@ -331,3 +359,256 @@ the same Settings panel to import the new song.
 - `frontend/src/components/DriveConfigFields.jsx` — hint updated to reference notebook variable name
 - `frontend/src/components/ImportSong.jsx` — reads saved model from Electron config on mount
 - `frontend/src/App.css` — Settings section styles
+## Notebook integration
+
+- 2026-10-06: Added madmom installation and beat/meter-analysis cells to `colab/mwtn_notebook.ipynb`; the legacy librosa cell is retained as a non-executing reference.
+
+## Tests
+
+- 2026-10-06: Added deterministic unit coverage for duration-to-tick conversion helpers.
+- 2026-10-06: Made duration lookup strict by default and preserved exact triplet matches over nearby dotted durations.
+- 2026-10-06: Added synthetic unit coverage for meter detection and beat-grid query behavior.
+- 2026-10-06: Added synthetic unit coverage for quantization, tuplets, rests, and measure validation.
+- 2026-10-06: Corrected humanized beat snapping and triplet classification for synthetic quantization cases.
+- 2026-10-06: Corrected triplet-group duration validation to span one complete beat.
+
+## Harmonic context
+
+- 2026-10-06: Added versioned harmonic key maps, enharmonic spelling, and legacy `key.json` migration.
+- 2026-10-06: Added optional-autochord and offline-librosa chord detection with beat-aligned cache artifacts.
+- 2026-10-06: Added non-breaking key-map, key-override, chord-detection, and chord-correction API routes; the existing cached `GET /chords` route is preserved.
+- 2026-10-06: Added focused harmonic-context and API test coverage; direct smoke tests pass while this virtual environment lacks pytest.
+- 2026-10-06: Added Colab harmonic-analysis cells for autochord installation, time-varying key maps, and beat-aligned chord detection.
+- 2026-10-06: Added React HarmonicAnalysis components for synchronized key display, chord timeline, overrides, loading, and error states.
+- 2026-10-06: Updated PowerShell startup scripts with required/optional dependency diagnostics, transcription-config validation, backend health reporting, mobile-data guidance, and Electron/browser fallback handling.
+- 2026-10-06: Added pure unit coverage for harmonic pitch mapping, enharmonic spelling, scales, chromatic checks, key-map ranges, serialization, round-trips, and legacy cache migration.
+- 2026-10-06: Added chord-detection unit tests and harmonic-pipeline integration tests covering parsing, merging, beat alignment, key-map caching, librosa fallback, and chord cache writes.
+
+## Solfa
+
+- 2026-10-06: Added a dependency-free movable-do solfège resolver and extended the canonical musical-event contract with optional solfège metadata.
+- 2026-10-06: Added a cached, stem-level solfège API endpoint with legacy note/key artifact compatibility.
+- 2026-10-06: Updated the active static solfège lane to consume stem-level results, render rests, and center the active event with a CSS transform.
+- 2026-10-06: Added idempotent Colab solfège artifact generation to the pipeline and notebook before output packaging.
+- 2026-10-06: Repaired activate.ps1 encoding and verified PowerShell parsing.
+- 2026-10-06: Fixed run.ps1 port cleanup loop by renaming the `$pid` variable to avoid PowerShell's read-only `$PID` automatic variable.
+- 2026-10-06: Hardened Colab notebook Cell 7 to locate the mwtn repository before importing backend beat-tracking code, with an actionable missing-source error.
+- 2026-10-06: Fixed Colab harmonic-analysis cells to reuse dynamic repository discovery and avoid hardcoded /content/mwtn audio/cache paths.
+- 2026-10-06: Repaired malformed Colab output-assembly Cell 10 source that had been split into one-character strings, causing an unterminated-string SyntaxError.
+- 2026-10-06: Repaired widespread mojibake in colab/mwtn_notebook.ipynb by restoring UTF-8 text and validated the notebook JSON.
+## 2026-10-06 — Frontend migration
+
+### Structure
+- Promoted the existing vanilla frontend from `frontend/static/` to `frontend/`.
+- Added native module entry point, observable store, and UI module extension points.
+
+### Backend
+- Changed FastAPI static serving to mount `frontend/` directly.
+
+### Verification
+- Confirmed the new entry point and store exist and retain ES-module syntax.
+
+## 2026-10-06 — Recovered harmonic panels
+
+### Feature
+- Replaced deleted React harmonic analysis panels with native DOM rendering.
+- Added key-map/chord detection API wrappers and playback-synchronized chord highlighting.
+- Added harmonic panel markup and scoped CSS.
+
+### Verification
+- `node --check` passed for the new harmonic module and modified API/app modules.
+
+## 2026-10-06 — Frontend encoding cleanup
+
+- Removed mojibake/non-ASCII corruption from `frontend/index.html` after the direct frontend copy.
+- Rewrote the file as UTF-8 without a BOM and verified no `â`, `Â`, or `Ã` markers remain.
+
+## 2026-10-06 — Browser runtime fixes
+
+- Fixed the harmonic chord-label expression that mixed nullish coalescing and logical OR without parentheses.
+- Replaced the non-standard vertical slider appearance with native vertical writing mode.
+- Added a local `frontend/favicon.svg` and linked it from the app shell.
+- Verified harmonic/app JavaScript syntax and favicon serving.
+
+## 2026-10-06 — User-resizable analysis panels
+
+- Added persistent drag handles for harmonic analysis, bass solfa, and lyrics panels.
+- Added keyboard resizing with arrow keys and double-click reset behavior.
+- Added responsive resize styling and preserved the harmonic handle across rerenders.
+
+## 2026-10-06 — Harmonic analysis and responsive UI
+
+### Backend
+- Removed the hard prerequisite for an existing `beats.json`; chord detection now builds beat analysis on demand.
+
+### Frontend
+- Added error handling for the harmonic Analyze action.
+- Added responsive breakpoints for sidebar, metadata panels, topbar, mixer, and mobile layouts.
+- Restored colorful bass solfa syllables using stable per-syllable color mapping.
+
+### Verification
+- Frontend harmonic and solfa modules pass `node --check`.
+- Python validation was unavailable because the environment could not launch `python.exe` or `py.exe`.
+## 2026-10-06 — Solfa colour restoration
+
+- Added shared solfa colour resolver and CSS variables.
+- Updated the active vanilla SolfaPanel to respect `solfa_colours`, including active brightness and live refresh events.
+- Loaded the persisted setting during app startup.
+## 2026-10-06 — Plan 12 UI stubs
+
+- Changed the extract panel's Colab action to an inline Plan 12 status message instead of throwing.
+- Kept Local CPU import available.
+- Routed mix/stem export buttons to the existing Studio export methods.
+- Added explicit status messaging for unavailable MIDI, MusicXML, and click-track exports.
+## 2026-10-06 — Frontend boot repair
+
+- Removed duplicate initialization of the legacy and rewritten extract panels.
+- Added the extract panel stylesheet to the actual served frontend entrypoint.
+## 2026-10-06 — Frontend duplicate archive
+
+- Moved the unused `frontend/static/` duplicate tree to `frontend/_archive/static-2026-10-06/`.
+- The active frontend remains under `frontend/index.html`, `frontend/js/`, and `frontend/css/`.
+- The archive is recoverable and contains 38 files.
+## 2026-10-06 — Restore packaged frontend layout
+
+- Restored `frontend/static/` from the archive after `run.ps1` reported it missing.
+- Copied the current frontend HTML, JavaScript, and CSS into `frontend/static/`.
+- Updated FastAPI static mounting to serve `frontend/static/`, matching the launcher and packaged project layout.
+## 2026-10-06 — Fix extract panel syntax error
+
+- Replaced the fragile nested one-line extract panel template with simpler pane builders.
+- Corrected missing array brackets in note-duration and confidence-threshold option lists.
+- Synchronized the corrected module into `frontend/static/js/ui/extractPanel.js`.
+- Validated both served and source modules as ES modules.
+## 2026-10-06 — Resizable panel startup guard
+
+- Guarded `clamp` and `addHandle` against missing panel elements.
+- Synchronized the fix to `frontend/static/js/resizablePanels.js`.
+- This prevents optional/missing panels from aborting the entire application boot.
+## 2026-10-06 — Force resizable module cache refresh
+
+- Confirmed HTTP served `resizablePanels.js` contains the null guard.
+- Added versioned `resizablePanels.v2.js` and changed the app import to bypass stale browser/Electron module cache.
+- Synchronized the versioned module and app entrypoint into `frontend/static/`.
+## 2026-10-06 — Resizable panel cache/runtime hardening
+
+- Confirmed the served v2 module still contained the failing `dataset` access.
+- Replaced panel dataset reads/writes with attribute access and added versioned `resizablePanels.v3.js`.
+- Updated the served app entrypoint to import v3, bypassing Electron/browser cache reuse.
+## 2026-10-06 — Fix resizable panel argument order
+
+- Corrected all `applyHeight` calls to pass `(panel, height)` as defined.
+- Synchronized the fix to the served v3 module and canonical frontend tree.
+## 2026-10-06 — Solfa, collapse, and playback layout
+
+- Applied shared syllable colours directly to bass solfa text, including active-note brightness.
+- Reworked lyrics and solfa collapse controls to use `hidden` and panel state classes.
+- Updated panel resizing to reserve transport and footer playback space.
+- Synchronized all changes into `frontend/static/`, the served frontend tree.
+## 2026-10-06 — Dynamic extraction model settings
+
+- Replaced hardcoded extraction model choices with the backend configuration catalogue.
+- Regenerate selectable stems from the selected model’s 2-, 4-, 5-, or 6-stem outputs.
+- Persist selected stems locally and added an Extract & Analyse end-user guide.
+- 2026-10-06 — Added `backend/jobs/notebook_generator.py` with `NotebookSettings`, strict parameters-cell lookup, JSON-safe string rendering, and immutable template generation for Colab exports.
+- 2026-10-06 — Added notebook download and parameter-text API routes to `backend/main.py`; routes create queued notebook jobs, generate in worker threads, slug filenames, and return structured generation failures.
+- 2026-10-06 — Added frontend Run Panel notebook flow, API client helpers, extract-panel wiring, polling tracker, clipboard fallback, and styling for Colab/local execution paths.
+# 2026-10-08 — MIDI exporter
+
+# 2026-10-08 — MusicXML exporter
+
+# 2026-10-08 — Score export API routes
+
+# 2026-10-08 — Frontend score export controls
+
+# 2026-10-08 — Colab score export pipeline
+
+## Added
+
+- Added `generate_score_exports` to `colab/mwtn_pipeline.py` for idempotent MIDI and MusicXML generation from note artifacts.
+- Added a post-solfa notebook cell that installs `mido` only when absent and runs each export independently before ZIP assembly.
+- Added per-format success/failure logging with output sizes and documented the approximately 50 KB Colab install cost.
+
+## Verification
+
+- Confirmed notebook JSON parses and the new cells occur between solfa generation and ZIP assembly.
+- Python syntax validation passed for `colab/mwtn_pipeline.py`.
+
+## Added
+
+- Added typed blob download helpers for MIDI and MusicXML to both active API module copies.
+- Replaced planned score-export status behavior with local download actions, per-button loading state, inline errors, and notes-readiness tooltips.
+- Synchronized `frontend/js/` changes to the served `frontend/static/js/` tree.
+
+## Compatibility
+
+- The requested React paths do not exist in this migrated repository; implementation uses the active vanilla frontend architecture.
+
+## Added
+
+- Added threaded MIDI and MusicXML download routes to `backend/main.py`.
+- Added legacy note JSON normalization, source-mtime cache checks, and structured export failures.
+
+## Verification
+
+- Validated `backend/main.py` syntax with the project virtual environment.
+
+## Added
+
+- Added `backend/export/musicxml_exporter.py` using only `xml.etree.ElementTree`.
+- Implemented multi-part score output, pitch conversion, standard durations, rests, key signatures, and incomplete-measure filling.
+
+## Verification
+
+- Validated exporter syntax with the project virtual environment.
+
+## Added
+
+- Added `backend/export/midi_exporter.py` with typed multi-track MIDI export, stem channels, timing conversion, rest filtering, and velocity defaults.
+- Added `backend/export/__init__.py` export surface.
+
+## Dependencies
+
+- Added `mido>=1.3.0` to `backend/requirements.txt`.
+
+## Documentation
+
+- Updated `codebase_reference.md` with the MIDI export module and event-field compatibility note.
+## 2026-10-08 — P08-BE-01 click track generator
+
+- Added `backend/audio/click_track.py` with validated beats JSON parsing and
+  stateless NumPy/SciPy WAV synthesis.
+- Added `backend/tests/test_click_track.py` covering mono 16-bit output,
+  timestamps, duration, and return path.
+- Updated `codebase_reference.md` with the new audio utility.
+- Verified the focused pytest after adjusting its sample rate to avoid a
+  Nyquist-aliasing artifact in the test fixture.
+## 2026-10-08 — P08-BE-02 click track export route
+
+- Added `GET /api/songs/{song_id}/click-track` to `backend/main.py`.
+- Added stale-cache handling, background-thread generation, WAV download headers,
+  and 404/500 error handling.
+- Added API tests for generation, cache reuse, and missing beat analysis.
+- `py_compile` passed; API execution is currently blocked at import by the
+  pre-existing `FileResponse | JSONResponse` annotation in the MIDI export
+  route under the installed FastAPI version.
+## 2026-10-08 — P08-FE-01/02 browser metronome
+
+- Added the Web Audio lookahead scheduler in `frontend/js/metronome.js`.
+- Added the metronome UI and tap-tempo behavior in `frontend/js/ui/metronome.js`.
+- Added `frontend/css/metronome.css` and the `#metronome-mount` HTML slot.
+- Updated `codebase_reference.md`.
+## 2026-10-08 — P08-FE-03 click track download
+
+- Added `API.downloadClickTrack(songId)` to both frontend API module copies.
+- Added click-track export handling, download naming, loading/error behavior,
+  and the beats-not-detected tooltip to both extract panel copies.
+- Preserved the repository's source/served frontend mirror convention.
+## 2026-10-08 — P08-COLAB-01 click track pipeline
+
+- Added `generate_click_track_artifact` to `colab/mwtn_pipeline.py`.
+- Added the guarded, zero-install click-track cell to
+  `colab/mwtn_notebook.ipynb` before ZIP assembly.
+- Added stale-output reuse, output-size logging, failure isolation, and legacy
+  float-beat normalization.
+- Verified notebook JSON and pipeline Python syntax.

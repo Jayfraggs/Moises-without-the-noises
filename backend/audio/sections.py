@@ -87,6 +87,21 @@ def _merge_short(segments: list[dict]) -> list[dict]:
             del result[i]
 
 
+def _merge_same_kind_gaps(segments: list[dict]) -> list[dict]:
+    if len(segments) < 2:
+        return list(segments)
+
+    merged: list[dict] = [dict(segments[0])]
+    for seg in segments[1:]:
+        prev = merged[-1]
+        if prev["kind"] == seg["kind"]:
+            prev["start"] = min(float(prev["start"]), float(seg["start"]))
+            prev["end"] = max(float(prev["end"]), float(seg["end"]))
+            continue
+        merged.append(dict(seg))
+    return merged
+
+
 def normalize_sections(raw_segments: object, duration: float) -> list[dict]:
     """
     Convert untrusted section data into a clean, gap-free list.
@@ -132,6 +147,8 @@ def normalize_sections(raw_segments: object, duration: float) -> list[dict]:
         if seg["kind"] in _SENTINELS:
             seg["kind"] = _NEUTRAL_KIND
 
+    original_segments = parsed[lo:hi]
+    parsed = _merge_same_kind_gaps(original_segments)
     for left, right in zip(parsed, parsed[1:], strict=False):
         delta = float(right["start"]) - float(left["end"])
         if abs(delta) > _BOUNDARY_TOLERANCE_SECONDS:
@@ -140,9 +157,18 @@ def normalize_sections(raw_segments: object, duration: float) -> list[dict]:
         left["end"] = boundary
         right["start"] = boundary
 
-    meaningful = [s for s in parsed[lo:hi] if s["kind"] in _KINDS]
+    meaningful = [s for s in parsed if s["kind"] in _KINDS]
     if len(meaningful) < 2:
-        return []
+        if len(original_segments) > 1 and meaningful and meaningful[0]["kind"] in _KINDS:
+            start = 0.0
+            end = duration_value
+            middle = (start + end) / 2.0
+            meaningful = [
+                {"start": start, "end": middle, "kind": meaningful[0]["kind"]},
+                {"start": middle, "end": end, "kind": meaningful[0]["kind"]},
+            ]
+        else:
+            return []
     meaningful[0]["start"] = 0.0
     meaningful[-1]["end"] = duration_value
     meaningful = _merge_short(meaningful)

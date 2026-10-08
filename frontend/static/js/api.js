@@ -5,6 +5,20 @@
 
 const BASE = '/api';
 
+export class ApiError extends Error {
+  constructor(message, status) { super(message); this.name = 'ApiError'; this.status = status; }
+}
+
+async function _download(path) {
+  const res = await fetch(`${BASE}${path}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body.detail || body.error || res.statusText || `HTTP ${res.status}`;
+    throw new ApiError(typeof detail === 'string' ? detail : JSON.stringify(detail), res.status);
+  }
+  return res.blob();
+}
+
 async function _json(res) {
   if (!res.ok) {
     let detail = res.statusText;
@@ -24,6 +38,10 @@ export const API = {
   async getManifest(songId) {
     return _json(await fetch(`${BASE}/songs/${songId}/manifest`));
   },
+
+  async downloadMidi(songId) { return _download(`/songs/${encodeURIComponent(songId)}/export/midi`); },
+  async downloadMusicXML(songId) { return _download(`/songs/${encodeURIComponent(songId)}/export/musicxml`); },
+  async downloadClickTrack(songId) { return _download(`/songs/${encodeURIComponent(songId)}/click-track`); },
 
   async deleteSong(songId) {
     return _json(await fetch(`${BASE}/songs/${songId}`, { method: 'DELETE' }));
@@ -73,6 +91,18 @@ export const API = {
     return _json(res);
   },
 
+  async getKeyMap(songId) {
+    const res = await fetch(`${BASE}/songs/${encodeURIComponent(songId)}/keymap`);
+    if (res.status === 404) return null;
+    return _json(res);
+  },
+
+  async patchKey(songId, body) {
+    return _json(await fetch(`${BASE}/songs/${encodeURIComponent(songId)}/key`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }));
+  },
+
   async getLyrics(songId) {
     const res = await fetch(`${BASE}/songs/${songId}/lyrics`);
     if (res.status === 404) return null;
@@ -83,6 +113,10 @@ export const API = {
     const res = await fetch(`${BASE}/songs/${songId}/chords`);
     if (res.status === 404) return null;
     return _json(res);
+  },
+
+  async detectChords(songId) {
+    return _json(await fetch(`${BASE}/songs/${encodeURIComponent(songId)}/chords/detect?force=true`));
   },
 
   async getSections(songId) {
@@ -117,6 +151,12 @@ export const API = {
       throw err;
     }
     return res.json();
+  },
+
+  async getStemSolfa(songId, stemName) {
+    return _json(await fetch(
+      `${BASE}/songs/${encodeURIComponent(songId)}/stems/${encodeURIComponent(stemName)}/solfa`,
+    ));
   },
 
   async computeSolfa(songId) {

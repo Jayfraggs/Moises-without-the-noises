@@ -1,0 +1,41 @@
+{
+  "file": "simple_melody.wav",
+  "expected_notes": [
+    {
+      "midi_pitch": 60,
+      "start_time": 0.0,
+      "end_time": 0.5
+    },
+    {
+      "midi_pitch": 64,
+      "start_time": 0.5,
+      "end_time": 1.0
+    },
+    {
+      "midi_pitch": 67,
+      "start_time": 1.0,
+      "end_time": 1.5
+    },
+    {
+      "midi_pitch": 64,
+      "start_time": 1.5,
+      "end_time": 2.0
+    },
+    {
+      "midi_pitch": 60,
+      "start_time": 2.0,
+      "end_time": 2.5
+    }
+  ],
+  "expected_key": {
+    "tonic": "C",
+    "mode": "major"
+  },
+  "expected_solfa": [
+    "Do",
+    "Mi",
+    "Sol",
+    "Mi",
+    "Do"
+  ]
+}

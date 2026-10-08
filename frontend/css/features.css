@@ -1,0 +1,161 @@
+/* ============================================================
+   features.css — styles for the three new feature additions:
+     1. Beat grid toolbar (above the ruler in the DAW)
+     2. Vocal split trigger row (in the mixer stem list)
+     3. Section auto-detect button (in the sections header)
+   ============================================================ */
+
+/* ── 1. Beat grid toolbar ─────────────────────────────────── */
+
+.beat-grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 24px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.beat-grid-toolbar.hidden { display: none; }
+
+.beat-grid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim, rgba(255, 255, 255, 0.65));
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  line-height: 1.4;
+}
+
+.beat-grid-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--text, #fff);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.beat-grid-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Active (edit mode on) */
+.beat-grid-toolbar.edit-active #beatEditToggleBtn,
+#beatEditToggleBtn.active {
+  background: rgba(80, 200, 255, 0.18);
+  border-color: rgba(80, 200, 255, 0.50);
+  color: rgba(80, 200, 255, 1);
+}
+
+/* Save button gets a slightly distinct colour */
+.beat-grid-save-btn:not(:disabled) {
+  border-color: rgba(244, 183, 64, 0.35);
+  color: rgba(244, 183, 64, 0.85);
+}
+
+.beat-grid-save-btn:not(:disabled):hover {
+  background: rgba(244, 183, 64, 0.12);
+  border-color: rgba(244, 183, 64, 0.60);
+  color: rgba(244, 183, 64, 1);
+}
+
+/* Beat count info chip */
+.beat-grid-info {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-dim, rgba(255, 255, 255, 0.40));
+  padding: 0 4px;
+  min-width: 52px;
+}
+
+/* Save badge (transient confirmation) */
+.beat-save-badge {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent, #4fb);
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 0 4px;
+}
+
+.beat-save-badge.visible { opacity: 1; }
+
+/* Canvas cursor styles injected dynamically — these just establish defaults */
+.beat-grid-canvas { display: block; }
+
+
+/* ── 2. Vocal split trigger row ────────────────────────────── */
+
+.vocal-split-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vocal-split-trigger.hidden { display: none; }
+
+.vocal-split-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid rgba(232, 116, 138, 0.35);
+  border-radius: 4px;
+  background: rgba(232, 116, 138, 0.08);
+  color: rgba(232, 116, 138, 0.90);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s, border-color 0.14s;
+}
+
+.vocal-split-btn:hover:not(:disabled) {
+  background: rgba(232, 116, 138, 0.16);
+  border-color: rgba(232, 116, 138, 0.65);
+  color: rgba(232, 116, 138, 1);
+}
+
+.vocal-split-btn:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
+}
+
+.vocal-split-status {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent, #4fb);
+}
+
+
+/* ── 3. Section auto-detect button ─────────────────────────── */
+
+/* Re-use the existing .sections-add-btn-label class for base styles,
+   just add a distinct colour for the detect variant. */
+#sectionsDetectBtn {
+  border-color: rgba(154, 74, 255, 0.35);
+  color: rgba(154, 74, 255, 0.85);
+  background: rgba(154, 74, 255, 0.06);
+}
+
+#sectionsDetectBtn:hover:not(:disabled) {
+  background: rgba(154, 74, 255, 0.14);
+  border-color: rgba(154, 74, 255, 0.55);
+  color: rgba(154, 74, 255, 1);
+}
+
+#sectionsDetectBtn:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
+}

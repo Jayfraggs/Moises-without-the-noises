@@ -202,6 +202,45 @@ DEFAULT_MODEL = "htdemucs_6s"
 # Stems eligible for note detection (pitch makes sense, drums do not)
 NOTE_ELIGIBLE_STEMS = list(FREQ_RANGES.keys())
 
+# Compatibility helper used by tests and ingestion routines.
+STEM_NAME_ALIASES: dict[str, str] = {
+    "vocal": "vocals",
+    "vox": "vocals",
+    "lead_vocals": "vocals",
+    "lead_vocal": "vocals",
+    "voice": "vocals",
+    "singer": "vocals",
+    "drum": "drums",
+    "beat": "drums",
+    "percussion": "drums",
+    "perc": "drums",
+    "kick": "drums",
+    "bass_guitar": "bass",
+    "bass_line": "bass",
+    "gtr": "guitar",
+    "guitars": "guitar",
+    "electric_guitar": "guitar",
+    "acoustic_guitar": "guitar",
+    "rhythm_guitar": "guitar",
+    "piano": "piano",
+    "keys": "piano",
+    "keyboard": "piano",
+    "keyboards": "piano",
+    "synth": "piano",
+    "accompaniment": "instrumental",
+    "backing": "instrumental",
+    "backing_track": "instrumental",
+    "music": "instrumental",
+    "inst": "instrumental",
+    "no_vocals": "instrumental",
+}
+
+
+def _normalise_stem_name(raw: str) -> str:
+    """Return a canonical stem name for compatibility with the ingestion contract."""
+    key = raw.lower().strip().replace(" ", "_").replace("-", "_")
+    return STEM_NAME_ALIASES.get(key, key)
+
 
 # ─── Engine runners ───────────────────────────────────────────────────────────
 

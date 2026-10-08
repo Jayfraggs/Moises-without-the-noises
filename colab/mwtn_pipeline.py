@@ -177,6 +177,43 @@ def detect_beats(stems_source_dir: Path):
     return beats_result
 
 
+def generate_click_track_artifact(output_dir: Path, beats_result: dict | None) -> Path | None:
+    """Generate a cached click-track WAV without failing the Colab pipeline."""
+    if not beats_result:
+        print('No beat analysis available — skipping click track.')
+        return None
+
+    beats_path = output_dir / 'beats.json'
+    click_path = output_dir / 'click_track.wav'
+    try:
+        from backend.audio.click_track import generate_click_track
+
+        payload = dict(beats_result)
+        raw_beats = payload.get('beats', [])
+        if raw_beats and isinstance(raw_beats[0], (int, float)):
+            downbeats = set(payload.get('downbeats', []))
+            payload['beats'] = [
+                {
+                    'time_s': float(time_s),
+                    'beat_number': 1 if time_s in downbeats or index % 4 == 0 else (index % 4) + 1,
+                    'bar_number': (index // 4) + 1,
+                }
+                for index, time_s in enumerate(raw_beats)
+            ]
+            beats_path.write_text(json.dumps(payload), encoding='utf-8')
+
+        if click_path.exists() and click_path.stat().st_mtime >= beats_path.stat().st_mtime:
+            print(f'Click track already current: {click_path} ({click_path.stat().st_size / 1e3:.1f} KB)')
+            return click_path
+
+        generate_click_track(beats_path, click_path)
+        print(f'Wrote click_track.wav ({click_path.stat().st_size / 1e3:.1f} KB)')
+        return click_path
+    except Exception as error:
+        print(f'Click track generation skipped: {error}')
+        return None
+
+
 def detect_key(stems_source_dir: Path):
     key_stem_priority = ['other', 'vocals', 'guitar', 'piano', 'bass']
     key_stem_path = None
@@ -468,6 +505,138 @@ def normalize_sections_simple(raw: list, duration: float) -> list:
     return sections
 
 
+def write_solfa_files(output_dir: Path, song_id: str) -> list[str]:
+    """Write idempotent movable-do solfège payloads for available pitched stems."""
+    major_solfa = ("Do", "Ra", "Re", "Me", "Mi", "Fa", "Se", "Sol", "Le", "La", "Te", "Ti")
+    pitch_classes = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    flat_aliases = {"Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#"}
+    key_path = output_dir / "key.json"
+
+    if not key_path.exists():
+        print("Solfa: key.json missing, skipping solfa generation.")
+        return []
+
+    key_data = json.loads(key_path.read_text(encoding="utf-8"))
+    root = str(key_data.get("root") or str(key_data.get("key", "C")).split()[0]).capitalize()
+    tonic_name = flat_aliases.get(root, root)
+    if tonic_name not in pitch_classes:
+        tonic_name = "C"
+    tonic_midi = 60 + pitch_classes.index(tonic_name)
+    mode_value = str(key_data.get("mode") or key_data.get("scale") or key_data.get("key") or "major").lower()
+    mode = "minor" if "min" in mode_value else "major"
+
+    written_stems: list[str] = []
+    for stem_name in ("vocals", "bass", "guitar", "piano"):
+        notes_path = output_dir / f"notes_{stem_name}.json"
+        if not notes_path.exists():
+            print(f"Solfa: {stem_name} skipped (notes file missing).")
+            continue
+
+        events: list[dict] = []
+        for note in json.loads(notes_path.read_text(encoding="utf-8")):
+            onset_s = float(note.get("start_time", note.get("start", note.get("time", 0.0))))
+            end_s = float(note.get("end_time", note.get("end", onset_s + note.get("duration", 0.0))))
+            pitch_midi = note.get("midi_pitch", note.get("midi"))
+            pitch_midi = int(pitch_midi) if pitch_midi is not None else None
+            if pitch_midi in (None, 0):
+                solfa = None
+            else:
+                degree = (pitch_midi - tonic_midi) % 12
+                if mode == "minor":
+                    degree = (degree + 9) % 12  # La-based minor
+                solfa = major_solfa[degree]
+            events.append({
+                "onset_s": onset_s,
+                "duration_s": max(0.0, end_s - onset_s),
+                "pitch_midi": pitch_midi,
+                "pitch_hz": note.get("frequency_hz", note.get("pitch_hz")),
+                "solfa": solfa,
+                "confidence": float(note.get("confidence", 1.0)),
+            })
+
+        payload = {
+            "song_id": song_id,
+            "stem": stem_name,
+            "tonic": tonic_name,
+            "tonic_midi": tonic_midi,
+            "mode": mode,
+            "events": events,
+        }
+        (output_dir / f"solfa_{stem_name}.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        written_stems.append(stem_name)
+        print(f"Solfa: wrote solfa_{stem_name}.json ({len(events)} events).")
+
+    return written_stems
+
+
+def generate_score_exports(
+    output_dir: Path,
+    tempo_bpm: float,
+    key_result: dict | None = None,
+    beats_result: dict | None = None,
+) -> dict[str, Path]:
+    """Generate idempotent MIDI and MusicXML files from notes in ``output_dir``."""
+    from types import SimpleNamespace
+
+    from backend.export.midi_exporter import export_midi
+    from backend.export.musicxml_exporter import export_musicxml
+
+    stem_events: dict[str, list[SimpleNamespace]] = {}
+    for notes_path in sorted(output_dir.glob("notes_*.json")):
+        stem_name = notes_path.stem.removeprefix("notes_")
+        raw_events = json.loads(notes_path.read_text(encoding="utf-8"))
+        if isinstance(raw_events, dict):
+            raw_events = raw_events.get("events", [])
+        stem_events[stem_name] = []
+        for note in raw_events:
+            onset_s = float(note.get("onset_s", note.get("start_time", note.get("start", note.get("time", 0.0)))))
+            duration_s = note.get("duration_s")
+            if duration_s is None:
+                end_s = note.get("end_time", note.get("end"))
+                duration_s = max(0.0, float(end_s) - onset_s) if end_s is not None else float(note.get("duration", 0.0))
+            stem_events[stem_name].append(SimpleNamespace(
+                onset_s=onset_s,
+                duration_s=float(duration_s),
+                duration_beats=note.get("duration_beats"),
+                pitch_midi=note.get("pitch_midi", note.get("midi", 0)),
+                velocity=note.get("velocity"),
+            ))
+
+    if not stem_events:
+        print("Score export: no note files found, skipping.")
+        return {}
+
+    tempo = float((beats_result or {}).get("tempo_bpm", (beats_result or {}).get("bpm", tempo_bpm)))
+    key_data = key_result or {}
+    key_text = str(key_data.get("key", "C major"))
+    key_parts = key_text.split()
+    key_tonic = str(key_data.get("tonic", key_data.get("root", key_parts[0] if key_parts else "C")))
+    mode = str(key_data.get("mode", key_parts[1] if len(key_parts) > 1 else "major"))
+    raw_signature = (beats_result or {}).get("time_signature", [4, 4])
+    time_signature = (int(raw_signature[0]), int(raw_signature[1]))
+    written: dict[str, Path] = {}
+
+    midi_path = output_dir / f"{output_dir.name}.mid"
+    try:
+        export_midi(stem_events, tempo, midi_path)
+        written["midi"] = midi_path
+        print(f"Score export MIDI: {midi_path} ({midi_path.stat().st_size} bytes)")
+    except Exception as exc:
+        print(f"Score export MIDI failed: {exc}")
+
+    musicxml_path = output_dir / f"{output_dir.name}.xml"
+    try:
+        export_musicxml(stem_events, tempo, key_tonic, mode, time_signature, musicxml_path)
+        written["musicxml"] = musicxml_path
+        print(f"Score export MusicXML: {musicxml_path} ({musicxml_path.stat().st_size} bytes)")
+    except Exception as exc:
+        print(f"Score export MusicXML failed: {exc}")
+
+    return written
+
+
 def build_output(
     song_id: str,
     input_path: Path,
@@ -496,6 +665,8 @@ def build_output(
         (output_dir / 'beats.json').write_text(json.dumps(beats_result))
         print(f'Wrote beats.json (BPM: {beats_result["bpm"]})')
 
+    generate_click_track_artifact(output_dir, beats_result)
+
     if key_result:
         (output_dir / 'key.json').write_text(json.dumps(key_result))
         print(f'Wrote key.json ({key_result["key"]})')
@@ -516,6 +687,10 @@ def build_output(
         (output_dir / f'notes_{instrument}.json').write_text(json.dumps(timeline))
         notes_available.append(instrument)
         print(f'Wrote notes_{instrument}.json ({len(timeline)} segments)')
+
+    # Pure transformation: no additional download or model inference required.
+    write_solfa_files(output_dir, song_id)
+    generate_score_exports(output_dir, beats_result['bpm'] if beats_result else 120.0, key_result, beats_result)
 
     # ── Vocal split stems ─────────────────────────────────────────────────────
     has_vocal_split = False

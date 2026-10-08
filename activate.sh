@@ -62,6 +62,15 @@ pip install --upgrade pip --quiet
 
 info "Installing backend dependencies..."
 pip install -r backend/requirements.txt
+
+if [ -f "./tests/requirements-test.txt" ]; then
+  info "Installing test dependencies..."
+  pip install -r ./tests/requirements-test.txt
+  ok "Test dependencies installed."
+else
+  warn "tests/requirements-test.txt not found; skipping test dependency install."
+fi
+
 ok "Backend dependencies installed."
 
 # ── 4. Frontend check ─────────────────────────────────────────────────────────

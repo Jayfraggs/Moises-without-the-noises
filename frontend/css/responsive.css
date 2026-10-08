@@ -1,0 +1,40 @@
+/* Responsive layout overrides. The waveform itself remains horizontally
+   scrollable, while surrounding panels reflow to the available viewport. */
+.daw-topbar, .daw-composer { min-width: 0; }
+.daw-composer { flex-wrap: wrap; }
+.daw-composer-stack { min-width: 0; }
+.daw-info-row, .stem-presence-panel { min-width: 0; }
+.daw-info-row > *, .stem-presence-panel > * { min-width: 0; }
+.harmonic-panel { width: auto; max-width: 100%; box-sizing: border-box; }
+
+@media (max-width: 1200px) {
+  .sidebar { width: 300px; }
+  .daw-info-row, .stem-presence-panel { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .daw-composer { gap: 6px; }
+  .footer-track-slot { min-width: 150px; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { width: 66px; }
+  .sidebar-body { display: none; }
+  .daw-info-row, .stem-presence-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .daw-topbar { overflow-x: auto; }
+  .daw-composer-stack { min-width: 640px; }
+  .daw-content { min-width: 620px; }
+}
+
+@media (max-width: 640px) {
+  html, body { overflow: auto; }
+  .daw { width: 100%; min-height: 100vh; height: auto; overflow: visible; }
+  .daw-topbar { min-height: 0; height: auto; align-items: stretch; }
+  .daw-brand { width: 48px; }
+  .daw-brand svg { width: 36px; height: 36px; }
+  .daw-composer-stack { min-width: 0; width: calc(100% - 48px); }
+  .daw-composer { height: auto; min-height: 66px; flex-wrap: wrap; padding: 6px; }
+  .daw-url-zone { flex: 1 1 100%; min-width: 0; }
+  .footer-track-slot { flex: 1 1 100%; min-width: 0; }
+  .daw-body { min-height: 680px; overflow: visible; }
+  .daw-info-row, .stem-presence-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .harmonic-panel { margin: 8px; }
+  .solfa-panel-body { overflow-x: auto; }
+}

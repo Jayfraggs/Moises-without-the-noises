@@ -3,20 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>mwtn — stem practice</title>
-    <link rel="stylesheet" href="/css/variables.css" />
-    <link rel="stylesheet" href="/css/base.css" />
-    <link rel="stylesheet" href="/css/layout.css" />
-    <link rel="stylesheet" href="/css/waves.css" />
-    <link rel="stylesheet" href="/css/daw.css" />
+    <title>mwtn  stem practice</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/variables.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/waves.css" />
+  <link rel="stylesheet" href="css/daw.css" />
+    <link rel="stylesheet" href="css/harmonic.css" />
+    <!-- Feature additions: beat grid toolbar, vocal split row, section detect -->
+    <link rel="stylesheet" href="css/features.css" />
+    <link rel="stylesheet" href="css/responsive.css" />
+    <link rel="stylesheet" href="css/resizable-panels.css" />
+    <link rel="stylesheet" href="css/extract-panel.css" />
+    <link rel="stylesheet" href="css/run-panel.css" />
+    <link rel="stylesheet" href="css/metronome.css" />
   </head>
   <body>
     <div class="app daw no-track" id="app">
 
-      <!-- ══ TOPBAR ══ -->
+      <!--  TOPBAR  -->
       <div class="daw-topbar">
         <div class="daw-brand">
-          <a href="#" title="mwtn — stem practice" aria-label="mwtn">
+          <a href="#" title="mwtn  stem practice" aria-label="mwtn">
             <svg viewBox="0 0 52 52" width="52" height="52" fill="none" aria-hidden="true">
               <rect x="6"  y="18" width="5" height="16" rx="2.5" fill="var(--accent)" opacity=".45"/>
               <rect x="14" y="10" width="5" height="32" rx="2.5" fill="var(--accent)" opacity=".65"/>
@@ -35,13 +44,13 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" style="flex-shrink:0" aria-hidden="true">
               <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
             </svg>
-            <input id="url" type="text" placeholder="Search library or drop a ZIP / audio file…" spellcheck="false" autocomplete="off" />
+            <input id="url" type="text" placeholder="Search library or drop a ZIP / audio file" spellcheck="false" autocomplete="off" />
             <span class="url-drop-error hidden" id="urlDropError" role="status" aria-live="polite"></span>
             <div class="file-pill hidden" id="filePill">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               <span class="file-name" id="fileName"></span>
               <span class="file-size" id="fileSize"></span>
-              <button class="file-clear" id="fileClear" type="button" aria-label="Remove file">×</button>
+              <button class="file-clear" id="fileClear" type="button" aria-label="Remove file"></button>
             </div>
             <button class="daw-upload-btn" type="button" title="Upload ZIP or audio file" id="uploadFileBtn" aria-label="Upload file">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -53,7 +62,7 @@
 
           <div class="daw-composer-sep"></div>
 
-          <!-- Extract button — opens model/stem configuration modal -->
+          <!-- Extract button  opens model/stem configuration modal -->
           <button class="daw-extract-menu-btn" id="extractMenuBtn" type="button" aria-haspopup="dialog" title="Configure extraction model and stems">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
@@ -72,7 +81,7 @@
                 <img id="np-thumb" class="np-art-img" alt="" />
               </div>
               <div class="track-panel-info">
-                <div class="daw-track-title track-panel-title" id="title">—</div>
+                <div class="daw-track-title track-panel-title" id="title"></div>
               </div>
               <button class="daw-fav-btn" type="button" id="fav-btn" aria-label="Toggle favorite" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -81,11 +90,11 @@
               </button>
             </div>
             <div class="daw-track-meta-line">
-              <span class="num" id="t-meta-duration">—</span>
-              <span class="daw-track-sep" aria-hidden="true">·</span>
-              <span id="t-stems-chip">— stems</span>
-              <span class="daw-track-sep" aria-hidden="true">·</span>
-              <span id="track-source">—</span>
+              <span class="num" id="t-meta-duration"></span>
+              <span class="daw-track-sep" aria-hidden="true"></span>
+              <span id="t-stems-chip"> stems</span>
+              <span class="daw-track-sep" aria-hidden="true"></span>
+              <span id="track-source"></span>
             </div>
             <div style="display:none" aria-hidden="true">
               <span id="t-time"></span><span id="t-bpm"></span><span id="t-key"></span><span id="track-artist"></span><span id="track-quality"></span><span id="track-extracted"></span>
@@ -111,8 +120,10 @@
         </div><!-- /.daw-composer-stack -->
       </div><!-- /.daw-topbar -->
 
-      <!-- ══ BODY ══ -->
+      <!--  BODY  -->
       <div class="daw-body">
+
+        <section id="metronome-mount" aria-label="Metronome"></section>
 
         <!-- Sidebar -->
         <aside class="sidebar" id="catalogPanel">
@@ -149,7 +160,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
               </svg>
-              <input id="catalogSearch" type="search" placeholder="Search library…" autocomplete="off" spellcheck="false" />
+              <input id="catalogSearch" type="search" placeholder="Search library" autocomplete="off" spellcheck="false" />
             </div>
 
             <!-- Import drop zone in sidebar -->
@@ -205,46 +216,46 @@
               <div class="daw-meta-card" data-meta="key">
                 <span class="meta-card-label">KEY</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value accent" id="summary-key">—</span>
+                  <span class="meta-card-value accent" id="summary-key"></span>
                   <span class="meta-card-sub" id="summary-scale"></span>
                 </div>
               </div>
               <div class="daw-meta-card" data-meta="bpm">
                 <span class="meta-card-label">BPM</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value accent" id="summary-bpm">—</span>
+                  <span class="meta-card-value accent" id="summary-bpm"></span>
                 </div>
               </div>
               <div class="daw-meta-card" data-meta="lufs">
                 <span class="meta-card-label">LUFS</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value" id="summary-lufs">—</span>
+                  <span class="meta-card-value" id="summary-lufs"></span>
                   <span class="meta-card-sub" id="summary-peak"></span>
                 </div>
               </div>
               <div class="daw-meta-card" data-meta="duration">
                 <span class="meta-card-label">DURATION</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value num" id="summary-duration">—</span>
+                  <span class="meta-card-value num" id="summary-duration"></span>
                 </div>
               </div>
               <div class="daw-meta-card" data-meta="scale">
                 <span class="meta-card-label">SCALE</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value" id="summary-scale-name">—</span>
+                  <span class="meta-card-value" id="summary-scale-name"></span>
                 </div>
               </div>
               <div class="daw-meta-card" data-meta="dr">
                 <span class="meta-card-label">DYNAMIC RANGE</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value" id="summary-dr">—</span>
+                  <span class="meta-card-value" id="summary-dr"></span>
                   <span class="meta-card-sub" id="summary-dr-label"></span>
                 </div>
               </div>
               <div class="daw-meta-card" data-meta="stability">
                 <span class="meta-card-label">TEMPO STABILITY</span>
                 <div class="meta-card-main">
-                  <span class="meta-card-value" id="summary-stability">—</span>
+                  <span class="meta-card-value" id="summary-stability"></span>
                   <span class="meta-card-sub" id="summary-stability-label"></span>
                 </div>
               </div>
@@ -254,34 +265,36 @@
             <div class="stem-presence-panel" id="stemPresencePanel">
               <div class="stem-card inactive" data-stem="vocals">
                 <span class="stem-card-label">GLOBAL VOCALS</span>
-                <span class="stem-card-pct" id="pct-vocals">—</span>
+                <span class="stem-card-pct" id="pct-vocals"></span>
               </div>
               <div class="stem-card inactive" data-stem="drums">
                 <span class="stem-card-label">DRUM INTENSITY</span>
-                <span class="stem-card-pct" id="pct-drums">—</span>
+                <span class="stem-card-pct" id="pct-drums"></span>
               </div>
               <div class="stem-card inactive" data-stem="bass">
                 <span class="stem-card-label">BASS DEPTH</span>
-                <span class="stem-card-pct" id="pct-bass">—</span>
+                <span class="stem-card-pct" id="pct-bass"></span>
               </div>
               <div class="stem-card inactive" data-stem="guitar">
                 <span class="stem-card-label">GUITAR PRESENCE</span>
-                <span class="stem-card-pct" id="pct-guitar">—</span>
+                <span class="stem-card-pct" id="pct-guitar"></span>
               </div>
               <div class="stem-card inactive" data-stem="piano">
                 <span class="stem-card-label">PIANO PRESENCE</span>
-                <span class="stem-card-pct" id="pct-piano">—</span>
+                <span class="stem-card-pct" id="pct-piano"></span>
               </div>
               <div class="stem-card inactive" data-stem="other">
                 <span class="stem-card-label">OTHER</span>
-                <span class="stem-card-pct" id="pct-other">—</span>
+                <span class="stem-card-pct" id="pct-other"></span>
               </div>
               <div class="stem-card inactive" data-stem="other" style="grid-column:auto">
                 <span class="stem-card-label">STEMS</span>
-                <span class="stem-card-pct" id="pct-stems">—</span>
+                <span class="stem-card-pct" id="pct-stems"></span>
               </div>
             </div>
           </div>
+
+          <section id="harmonicPanel" class="harmonic-panel" aria-label="Harmonic Analysis"></section>
 
           <!-- Sections bar -->
           <div class="daw-section-ribbon">
@@ -299,6 +312,11 @@
                   <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                   Add
                 </button>
+                <!-- Auto-detect: triggers allin1 / librosa section detection on the backend -->
+                <button class="sections-add-btn-label hidden" id="sectionsDetectBtn" type="button" aria-label="Auto-detect song sections" title="Detect sections with AI (requires allin1 or falls back to librosa)">
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  Auto-detect
+                </button>
               </span>
             </div>
             <div class="daw-sections-area" id="daw-sections">
@@ -310,26 +328,37 @@
           <div class="daw-wave-header">
             <div class="daw-wave-label">
               <span class="daw-label-title">Mixer</span>
-              <span class="uplabel daw-label-sub">Drag fader · M/S</span>
+              <span class="uplabel daw-label-sub">Drag fader  M/S</span>
             </div>
             <div class="daw-ruler-area">
-              <!-- Beat grid toolbar -->
-              <div class="beat-grid-toolbar hidden" id="beatGridToolbar">
-                <span class="beat-grid-badge">Beat Editor</span>
-                <span class="beat-grid-info" id="beatGridInfo">— beats</span>
-                <button class="beat-tool-btn" id="beatEditToggleBtn" type="button" title="Toggle edit mode">Edit</button>
-                <button class="beat-tool-btn" id="beatSaveBtn"       type="button" title="Save edits" disabled>Save</button>
-                <button class="beat-tool-btn" id="beatResetBtn"      type="button" title="Reset to detected">Reset</button>
-                <span class="beat-save-badge" id="beatSaveBadge"></span>
+              <!-- Beat grid toolbar: shown when beat data is available -->
+              <div class="beat-grid-toolbar hidden" id="beatGridToolbar" role="toolbar" aria-label="Beat grid controls">
+                <span class="beat-grid-info" id="beatGridInfo" aria-live="polite"></span>
+                <button class="beat-grid-btn" id="beatEditToggleBtn" type="button"
+                        aria-pressed="false" title="Toggle beat grid edit mode  drag beats on canvas">
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                  </svg>
+                  Edit beats
+                </button>
+                <button class="beat-grid-btn" id="beatResetBtn" type="button"
+                        title="Reset to auto-detected beat grid">
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.49"/>
+                  </svg>
+                  Reset
+                </button>
+                <button class="beat-grid-btn beat-grid-save-btn" id="beatSaveBtn" type="button"
+                        disabled title="Save beat grid edits to server">
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                  Save
+                </button>
+                <span class="beat-save-badge" id="beatSaveBadge" aria-live="polite"></span>
               </div>
-              <!-- VU toggle -->
-              <button class="vu-toggle-btn" id="vuToggleBtn" type="button" aria-pressed="false" title="Toggle VU meters">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <line x1="4" y1="9" x2="4" y2="15"/><line x1="9" y1="5" x2="9" y2="19"/>
-                  <line x1="14" y1="8" x2="14" y2="16"/><line x1="19" y1="4" x2="19" y2="20"/>
-                </svg>
-                Meters
-              </button>
+
               <div class="lanes-ruler" data-position="top">
                 <div class="lanes-ruler-time" id="ruler-time">
                   <div class="playhead-marker" aria-hidden="true">
@@ -350,6 +379,23 @@
               <div class="stem-list" aria-label="Waveform lane icons">
                 <span class="original" data-stem="original"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>Original</span></em><b class="stem-mute" data-stem="original" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="original" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="original"></button><i class="mini-meter"></i></span>
                 <span class="vocals" data-stem="vocals"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg><span>Vocals</span></em><b class="stem-mute" data-stem="vocals" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="vocals" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="vocals"></button><i class="mini-meter"></i></span>
+                <!-- Lead vocals stem  shown by JS when lead_vocals.wav is present (after vocal split) -->
+                <span class="lead_vocals hidden" data-stem="lead_vocals"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg><span>Lead Vocals</span></em><b class="stem-mute" data-stem="lead_vocals" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="lead_vocals" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="lead_vocals"></button><i class="mini-meter"></i></span>
+                <!-- Backing vocals stem  shown by JS when backing_vocals.wav is present -->
+                <span class="backing_vocals hidden" data-stem="backing_vocals"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg><span>Backing Vocals</span></em><b class="stem-mute" data-stem="backing_vocals" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="backing_vocals" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="backing_vocals"></button><i class="mini-meter"></i></span>
+                <!-- Vocal split trigger  shown when vocals.wav exists but split hasn't run yet -->
+                <span class="vocal-split-trigger hidden" id="vocalSplitRow">
+                  <button class="vocal-split-btn" id="vocalSplitBtn" type="button"
+                          title="Split vocals into Lead + Backing using AI (requires audio-separator on backend)">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                      <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+                      <path d="M12 8v8"/><path d="M8 12h8"/>
+                    </svg>
+                    Split Lead / Backing Vocals
+                  </button>
+                  <span class="vocal-split-status" id="vocalSplitStatus" aria-live="polite"></span>
+                </span>
                 <span class="drums" data-stem="drums"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M7 13.5a5 5 0 0 0 10 0"/><path d="M7 13.5h10"/><circle cx="9" cy="10" r="2.5"/><circle cx="15" cy="10" r="2.5"/></svg><span>Drums</span></em><b class="stem-mute" data-stem="drums" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="drums" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="drums"></button><i class="mini-meter"></i></span>
                 <span class="bass" data-stem="bass"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M16.5 3h4v5h-3"/><path d="M17.5 5.5 9.8 13.2"/><path d="M10 13c1.6 2.2 1.1 5.1-1.2 6.5-2.1 1.3-5 .5-6-1.6-.9-1.9-.1-4.1 1.8-5 .9-.4 1.8-.4 2.8-.1.1-1.1.6-2.1 1.6-2.6 1.2-.6 2.6-.1 3.2 1.1"/></svg><span>Bass</span></em><b class="stem-mute" data-stem="bass" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="bass" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="bass"></button><i class="mini-meter"></i></span>
                 <span class="guitar" data-stem="guitar"><i class="drag-handle"></i><em><svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M16 4.5 20 2l2 2-2.5 4"/><path d="M18.2 5.8 10.2 13.8"/><circle cx="7" cy="16.4" r="1.4"/></svg><span>Guitar</span></em><b class="stem-mute" data-stem="guitar" role="button" tabindex="0" aria-pressed="false">M</b><b class="stem-solo" data-stem="guitar" role="button" tabindex="0" aria-pressed="false">S</b><button class="stem-monitor" type="button" data-stem="guitar"></button><i class="mini-meter"></i></span>
@@ -377,7 +423,7 @@
                     <div class="wave-loading-lines" aria-hidden="true">
                       <i></i><i></i><i></i><i></i><i></i><i></i>
                     </div>
-                    <p id="waveLoadingPhrase" class="wave-loading-msg">Loading stems…</p>
+                    <p id="waveLoadingPhrase" class="wave-loading-msg">Loading stems</p>
                   </div>
                 </div>
               </div>
@@ -385,32 +431,8 @@
 
           </div><!-- /.daw-content -->
 
-          <!-- ══ VU METER PANEL ══ -->
-          <div id="vuMeterPanel" class="vu-meter-panel hidden" aria-label="VU Meters">
-            <div class="vu-meter-panel-header">
-              <span class="vu-panel-title">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <line x1="4" y1="9" x2="4" y2="15"/><line x1="9" y1="5" x2="9" y2="19"/>
-                  <line x1="14" y1="8" x2="14" y2="16"/><line x1="19" y1="4" x2="19" y2="20"/>
-                </svg>
-                VU Meters
-              </span>
-              <div class="vu-legend">
-                <span class="vu-legend-seg" style="background:#22c55e">Normal</span>
-                <span class="vu-legend-seg" style="background:#f4b740">Warn</span>
-                <span class="vu-legend-seg" style="background:#ff2d2d">Clip</span>
-              </div>
-              <button class="vu-collapse-btn" id="vuMeterCollapseBtn" type="button" aria-expanded="true" title="Collapse">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-              </button>
-            </div>
-            <div class="vu-meter-body" id="vuMeterBody">
-              <!-- Populated by vu-meters.js -->
-            </div>
-          </div>
-
-          <!-- ══ BASS SOLFÈGE PANEL ══ -->
-          <section id="solfaPanel" class="solfa-panel" aria-label="Bass solfège">
+          <!--  BASS SOLFGE PANEL  -->
+          <section id="solfaPanel" class="solfa-panel" aria-label="Bass solfge">
 
             <!-- Panel header -->
             <div class="solfa-panel-header">
@@ -420,7 +442,7 @@
                   <path d="M16.5 3h4v5h-3"/><path d="M17.5 5.5 9.8 13.2"/>
                   <path d="M10 13c1.6 2.2 1.1 5.1-1.2 6.5-2.1 1.3-5 .5-6-1.6-.9-1.9-.1-4.1 1.8-5 .9-.4 1.8-.4 2.8-.1.1-1.1.6-2.1 1.6-2.6 1.2-.6 2.6-.1 3.2 1.1"/>
                 </svg>
-                Bass Solfège
+                Bass Solfge
               </div>
               <!-- Key label -->
               <span id="solfaKeyLabel" class="solfa-key-badge"></span>
@@ -443,26 +465,68 @@
                     <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                   </svg>
-                  Extract solfège
+                  Extract solfge
                 </button>
                 <div id="solfaError" class="solfa-error" style="display:none"></div>
               </div>
 
               <!-- Spinner -->
-              <div id="solfaSpinner" class="solfa-spinner" style="display:none" role="status" aria-label="Extracting…">
+              <div id="solfaSpinner" class="solfa-spinner" style="display:none" role="status" aria-label="Extracting">
                 <span class="solfa-spin-ring"></span>
-                <span id="solfaPhrase" class="solfa-phrase">Extracting bass notes…</span>
+                <span id="solfaPhrase" class="solfa-phrase">Extracting bass notes</span>
               </div>
 
-              <!-- Syllable grid — JS populates -->
-              <div id="solfaGrid" class="solfa-grid" role="list" aria-label="Solfège events"></div>
+              <!-- Syllable grid  JS populates -->
+              <div id="solfaGrid" class="solfa-grid" role="list" aria-label="Solfge events"></div>
 
             </div><!-- /.solfa-panel-body -->
           </section><!-- /#solfaPanel -->
 
+          <!--  LYRICS PANEL  -->
+          <section id="lyricsPanel" class="lyrics-panel" aria-label="Synced lyrics">
+
+            <!-- Panel header -->
+            <div class="lyrics-panel-header">
+              <div class="lyrics-panel-title">
+                <!-- Lyrics icon -->
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Lyrics
+              </div>
+              <!-- Language badge -->
+              <span id="lyricsLangBadge" class="lyrics-lang-badge" style="display:none"></span>
+              <!-- NOW word display -->
+              <span id="lyricsNow" class="lyrics-now-pill" style="display:none" aria-live="polite" aria-atomic="true"></span>
+              <!-- Collapse toggle -->
+              <button class="lyrics-collapse-btn" id="lyricsCollapseBtn" type="button" aria-expanded="true" aria-controls="lyricsBody" title="Collapse">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
+
+            <!-- Panel body -->
+            <div class="lyrics-panel-body" id="lyricsBody">
+
+              <!-- Loading / empty states -->
+              <div id="lyricsEmpty" class="lyrics-empty" style="display:none">
+                <p id="lyricsPhrase" class="lyrics-phrase"></p>
+              </div>
+
+              <!-- Spinner -->
+              <div id="lyricsSpinner" class="lyrics-spinner" style="display:none" role="status" aria-label="Loading lyrics">
+                <span class="lyrics-spin-ring"></span>
+                <span class="lyrics-phrase">Loading lyrics</span>
+              </div>
+
+              <!-- Word grid  JS populates -->
+              <div id="lyricsGrid" class="lyrics-grid" role="list" aria-label="Lyrics words"></div>
+
+            </div><!-- /.lyrics-panel-body -->
+          </section><!-- /#lyricsPanel -->
+
         </div><!-- /#lanes -->
 
-        <!-- ══ FOOTER ══ -->
+        <!--  FOOTER  -->
         <footer class="daw-footer">
           <div class="footer-main">
             <div class="footer-row-controls">
@@ -526,7 +590,7 @@
                   <span class="footer-group-label" id="t-pitch-label">Global key</span>
                   <div class="footer-group-body">
                     <div class="footer-seg pitch-group" id="t-pitch-wrap" role="group" aria-labelledby="t-pitch-label">
-                      <button class="pitch-btn" id="t-pitch-down" type="button" aria-label="Transpose down" disabled>−</button>
+                      <button class="pitch-btn" id="t-pitch-down" type="button" aria-label="Transpose down" disabled></button>
                       <output class="pitch-value" id="t-pitch-value" aria-labelledby="t-pitch-label" aria-live="polite">0</output>
                       <button class="pitch-btn" id="t-pitch-up" type="button" aria-label="Transpose up" disabled>+</button>
                     </div>
@@ -608,10 +672,6 @@
                       <input type="checkbox" id="t-export-click">
                       <span>Include click track</span>
                     </label>
-                    <label class="export-click-opt" id="t-export-loop-wrap" title="Export only the loop region">
-                      <input type="checkbox" id="t-export-loop-only">
-                      <span>Loop region only</span>
-                    </label>
                     <button class="chip-panel-item export-item" id="t-export-mix" type="button" role="menuitem">
                       <span class="chip-item-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><line x1="4" y1="9" x2="4" y2="15"/><line x1="9" y1="5" x2="9" y2="19"/><line x1="14" y1="8" x2="14" y2="16"/><line x1="19" y1="4" x2="19" y2="20"/></svg></span>
                       <span class="chip-item-text"><span class="chip-item-title">Export Mix</span><span class="chip-item-desc">Mixed audio</span></span>
@@ -620,11 +680,6 @@
                       <span class="chip-item-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polygon points="12 2 22 8.5 12 15 2 8.5 12 2"/><polyline points="2 15.5 12 22 22 15.5"/></svg></span>
                       <span class="chip-item-text"><span class="chip-item-title">Export All Stems</span><span class="chip-item-desc">All stems as .zip</span></span>
                     </button>
-                    <!-- Per-stem export rows — populated by app.js -->
-                    <div class="export-per-stem-section" id="export-per-stem-section">
-                      <div class="export-per-stem-label">Per stem</div>
-                      <div id="export-per-stem-list"></div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -636,9 +691,8 @@
                   <div class="footer-wave-ticks" id="footer-wave-ticks" aria-hidden="true"></div>
                   <div class="footer-wave-bar">
                     <canvas id="footer-waveform" aria-hidden="true"></canvas>
-                    <div class="footer-scrub" id="footer-scrub" role="slider" aria-label="Seek" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="footer-scrub" id="footer-scrub" role="slider" aria-label="Seek" tabindex="0">
                       <div class="footer-scrub-fill" id="footer-scrub-fill"></div>
-                      <div class="scrub-tooltip" id="scrub-tooltip" aria-hidden="true"></div>
                     </div>
                   </div>
                 </div>
@@ -664,7 +718,7 @@
           Extraction Settings
         </h2>
         <p style="margin:0 0 18px;font-size:11px;color:var(--muted);line-height:1.5">
-          Configure these options, then copy them into <strong>Cell 3</strong> of the Colab notebook before running.
+          Choose a model and stems, then either copy the settings for Colab or run separation locally.
         </p>
 
         <!-- Model selector -->
@@ -673,7 +727,7 @@
             Separation Model
           </label>
           <select id="extractModelSelect" style="width:100%;padding:7px 10px;background:var(--bg);border:1px solid var(--border-strong);border-radius:7px;color:var(--fg);font-family:var(--font-mono);font-size:12px;outline:none;cursor:pointer">
-            <option>Loading…</option>
+            <option>Loading</option>
           </select>
         </div>
 
@@ -705,29 +759,50 @@
           </label>
           <label class="extract-extra-label">
             <input type="checkbox" id="extractSolfa">
-            <span>Include bass solfège / note extraction</span>
+            <span>Include bass solfge / note extraction</span>
           </label>
         </div>
 
-        <!-- Copy button -->
-        <button id="extractCopyBtn" style="
-          width:100%;padding:10px;border-radius:8px;
-          border:1px solid rgba(244,183,64,0.35);
-          background:rgba(244,183,64,0.14);
-          color:var(--accent);font-family:var(--font-mono);
-          font-size:13px;font-weight:700;cursor:pointer;
-          display:flex;align-items:center;justify-content:center;gap:7px;
-          transition:background 0.12s
-        ">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-          </svg>
-          Copy Colab Settings
-        </button>
+        <!-- Action buttons -->
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <!-- Run locally -->
+          <button id="extractRunLocalBtn" style="
+            width:100%;padding:10px;border-radius:8px;
+            border:1px solid rgba(34,197,94,0.35);
+            background:rgba(34,197,94,0.10);
+            color:#4ade80;font-family:var(--font-mono);
+            font-size:13px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:7px;
+            transition:background 0.12s
+          ">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Run Locally  pick audio file
+          </button>
+          <p style="margin:0;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
+            Runs Demucs (or selected engine) on your machine. Requires the engine to be installed. Slow on CPU.
+          </p>
 
-        <p style="margin:10px 0 0;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
-          Paste into <code style="font-family:var(--font-mono);font-size:10px">Cell 3</code> of the Colab notebook, then run all cells.
-        </p>
+          <!-- Copy for Colab -->
+          <button id="extractCopyBtn" style="
+            width:100%;padding:10px;border-radius:8px;
+            border:1px solid rgba(244,183,64,0.35);
+            background:rgba(244,183,64,0.14);
+            color:var(--accent);font-family:var(--font-mono);
+            font-size:13px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:7px;
+            transition:background 0.12s
+          ">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy Colab Settings
+          </button>
+          <p style="margin:0;font-size:10px;color:var(--muted);text-align:center;line-height:1.5">
+            Paste into <code style="font-family:var(--font-mono);font-size:10px">Cell 3</code> of the Colab notebook, then run all cells.
+          </p>
+        </div>
       </div>
     </div>
 
@@ -757,7 +832,7 @@
         </div>
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
           <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Colab notebook</div>
-          <div style="font-size:11px;color:var(--fg-2);line-height:1.5">The notebook runs on Google's free GPU — typically under 2 minutes per song. Open it in your browser, run all cells, and the output ZIP lands in your Drive folder automatically.</div>
+          <div style="font-size:11px;color:var(--fg-2);line-height:1.5">The notebook runs on Google's free GPU  typically under 2 minutes per song. Open it in your browser, run all cells, and the output ZIP lands in your Drive folder automatically.</div>
           <a href="#" id="settingsOpenColab" style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;color:var(--accent);font-size:12px;text-decoration:none">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             Open notebook in browser
@@ -766,6 +841,7 @@
       </div>
     </div>
 
-    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="js/main.js"></script>
   </body>
 </html>
+

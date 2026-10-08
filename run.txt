@@ -1,1 +1,7 @@
 cmd /c "cd frontend && npm run build"
+
+Get-NetTCPConnection -LocalPort 8000
+Stop-Process -Id 12345 -Force
+
+.\run.ps1
+.\activate.ps1

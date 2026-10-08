@@ -123,9 +123,13 @@ def _detect_with_allin1(audio_path: Path, duration: float) -> list[dict] | None:
 
 def _detect_with_librosa(audio_path: Path, duration: float) -> list[dict] | None:
     """
-    Lightweight novelty-based segmentation via librosa.
-    Labels all segments as 'part' (no semantic labels).
-    Returns None only if librosa is unavailable or the track is too short.
+    Lightweight, version-tolerant fallback segmentation via librosa.
+
+    This intentionally avoids the brittle onset/peak_pick chain that can fail on
+    certain librosa versions or when the waveform is very quiet/monotone. Instead,
+    it computes a simple energy envelope and produces stable boundaries by slicing
+    the track into a handful of equal-length sections, which still yields valid
+    section records for the app even when the model fails.
     """
     try:
         import librosa
@@ -136,35 +140,65 @@ def _detect_with_librosa(audio_path: Path, duration: float) -> list[dict] | None
     try:
         logger.info("section_detection: running librosa heuristic on %s", audio_path.name)
         y, sr = librosa.load(str(audio_path), sr=22050, mono=True, duration=min(duration, 600))
+        if y.size == 0:
+            return None
 
-        # Onset novelty is the simplest stable fallback across librosa versions.
-        onset = librosa.onset.onset_strength(y=y, sr=sr, hop_length=512)
-        novelty = librosa.util.normalize(onset)
+        # Energy envelope is more stable than peak-picking onset novelty across
+        # librosa versions and on quiet or repetitive tracks.
+        frame_length = max(1024, int(sr * 0.5))
+        hop_length = frame_length // 4
+        energy = np.abs(librosa.stft(y, n_fft=frame_length, hop_length=hop_length))
+        power = np.mean(np.square(energy), axis=0)
+        if power.size == 0:
+            return None
 
-        boundary_frames = librosa.util.peak_pick(
-            novelty,
-            pre_max=1,
-            post_max=1,
-            pre_avg=3,
-            post_avg=3,
-            delta=0.15,
-            wait=max(2, int(sr * 6 / 512)),
-        )
-        boundary_times = librosa.frames_to_time(boundary_frames, sr=sr, hop_length=512).tolist()
+        # Smooth and convert to a small set of robust boundaries.
+        smooth = np.convolve(power, np.ones(min(9, power.size)) / min(9, power.size), mode="same")
+        baseline = float(np.median(smooth)) if smooth.size else 0.0
+        threshold = max(float(np.max(smooth) * 0.35), baseline + 1e-9)
 
-        if not boundary_times:
-            # Fallback for very quiet/boring material: split into a few equal sections.
-            step = duration / 4.0
-            edges = [0.0, step, step * 2, step * 3, duration]
+        # Use dynamic detection if the energy profile contains meaningful changes;
+        # otherwise fall back to a uniform split to keep the detector usable.
+        if np.any(smooth > threshold):
+            change = np.diff(smooth)
+            if change.size > 0:
+                candidates = np.where(change > max(np.std(change) * 0.5, 1e-6))[0]
+                if candidates.size > 0:
+                    boundary_frames = np.unique(np.clip(candidates + 1, 0, smooth.size - 1))
+                    boundary_times = librosa.frames_to_time(boundary_frames, sr=sr, hop_length=hop_length)
+                    edges = [0.0] + [float(t) for t in boundary_times if 0.0 < float(t) < duration] + [float(duration)]
+                    edges = sorted(set(round(float(v), 3) for v in edges))
+                else:
+                    edges = [0.0, duration]
+            else:
+                edges = [0.0, duration]
         else:
-            edges = [0.0] + [round(float(t), 3) for t in boundary_times if 0.0 < float(t) < duration] + [round(float(duration), 3)]
-            edges = sorted(set(round(float(v), 3) for v in edges))
+            edges = [0.0, duration]
+
+        if len(edges) < 2:
+            edges = [0.0, duration]
+
+        # Ensure at least 2 sections, even on monotone material.
+        if len(edges) == 2:
+            sections_count = max(2, min(6, int(duration / 20.0)))
+            step = duration / float(sections_count)
+            edges = [0.0] + [round(float(i * step), 3) for i in range(1, sections_count)] + [round(float(duration), 3)]
 
         raw: list[dict] = []
         for i in range(len(edges) - 1):
             s, e = edges[i], edges[i + 1]
             if e - s >= 1.0:
                 raw.append({"start": float(s), "end": float(e), "label": "part"})
+
+        if len(raw) < 2:
+            sections_count = max(2, min(6, int(duration / 15.0)))
+            step = duration / float(sections_count)
+            raw = [
+                {"start": float(i * step), "end": float((i + 1) * step), "label": "part"}
+                for i in range(sections_count)
+            ]
+            raw[0]["start"] = 0.0
+            raw[-1]["end"] = float(duration)
 
         return raw if len(raw) >= 2 else None
 
@@ -204,21 +238,24 @@ def detect_sections(song_dir: Path, report=None) -> list[dict]:
         logger.info(msg)
 
     # ── Pick audio source ─────────────────────────────────────────────────────
-    # Prefer a mix/full-mix stem; fall back to the first available stem.
-    _SOURCE_PREF = ("other", "vocals", "bass", "drums", "guitar", "piano")
-    source: Path | None = None
-    for name in _SOURCE_PREF:
+    # Prefer the longest, most informative stem instead of blindly taking the
+    # first available file in a fixed preference order. This avoids choosing a
+    # short vocal or percussion stem when a full-length bass or mix stem is
+    # present for section detection.
+    candidates: list[tuple[float, Path]] = []
+    for name in ("other", "vocals", "bass", "drums", "guitar", "piano"):
         candidate = song_dir / f"{name}.wav"
         if candidate.is_file():
-            source = candidate
-            break
-    if source is None:
+            candidates.append((candidate.stat().st_size, candidate))
+    if not candidates:
         for wav in song_dir.glob("*.wav"):
-            source = wav
-            break
-    if source is None:
+            candidates.append((wav.stat().st_size, wav))
+
+    if not candidates:
         _report("section_detection: no WAV stems found")
         return []
+
+    source = max(candidates, key=lambda item: item[0])[1]
 
     # ── Get duration ──────────────────────────────────────────────────────────
     try:

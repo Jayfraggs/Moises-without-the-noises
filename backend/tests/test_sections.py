@@ -50,6 +50,18 @@ def test_gap_beyond_tolerance_returns_empty():
     out = normalize_sections(raw, duration=60.0)
     assert out == []
 
+
+def test_same_kind_segments_with_small_gaps_are_unified():
+    raw = [
+        {"start": 0.0, "end": 20.0, "label": "part"},
+        {"start": 20.75, "end": 40.0, "label": "part"},
+        {"start": 40.5, "end": 60.0, "label": "part"},
+    ]
+    out = normalize_sections(raw, duration=60.0)
+    assert len(out) >= 2
+    assert all(s["kind"] == "part" for s in out)
+
+
 def test_very_short_section_merged():
     raw = [_seg(0, 30, "verse"), _seg(30, 30.1, "bridge"), _seg(30.1, 60, "chorus")]
     out = normalize_sections(raw, duration=60.0)
@@ -118,6 +130,28 @@ def test_librosa_fallback_returns_segments_for_synthetic_track():
     assert len(sections) >= 2
     assert sections[0]["start"] == pytest.approx(0.0, abs=1.0)
     assert sections[-1]["end"] >= dur - 1.0
+
+
+def test_librosa_fallback_survives_peak_pick_api_mismatch(monkeypatch):
+    import librosa
+
+    sr = 22050
+    dur = 16.0
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    y = np.sin(2 * np.pi * 220 * t).astype(np.float32)
+
+    with tempfile.TemporaryDirectory(prefix="mwtn-sections-") as tmpdir:
+        path = Path(tmpdir) / "synthetic.wav"
+        sf.write(path, y, sr)
+
+        monkeypatch.setattr(librosa.onset, "onset_strength", lambda **kwargs: np.ones(32, dtype=np.float32))
+        monkeypatch.setattr(librosa.util, "normalize", lambda x: x)
+        monkeypatch.setattr(librosa.util, "peak_pick", lambda *args, **kwargs: (_ for _ in ()).throw(TypeError("array(...) is not a callable object")))
+
+        sections = _detect_with_librosa(path, dur)
+
+    assert sections is not None
+    assert len(sections) >= 2
 
 
 def test_allin1_timeout_falls_back_to_none(monkeypatch):

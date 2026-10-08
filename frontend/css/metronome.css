@@ -1,0 +1,9 @@
+.metronome-panel{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--panel,#1a1a1a);border:1px solid var(--border,#2e2e2e);border-radius:4px;color:var(--fg,#f0f0f0)}
+.metro-pulse{width:40px;height:40px;flex:0 0 40px;border-radius:50%;background:var(--accent);opacity:.2;transform:scale(1);transition:opacity .08s ease,transform .08s ease}
+.metro-pulse--active{opacity:1;transform:scale(1.15)}
+.metro-bpm{display:flex;align-items:baseline;gap:5px;font-family:var(--font-mono,monospace)}
+.metro-bpm-value{font-size:20px;color:var(--accent)}
+.metro-bpm-label{font-size:10px;color:var(--muted,#888)}
+.metro-controls{display:flex;gap:6px;margin-left:auto}
+.metro-controls button{padding:6px 9px;background:var(--panel-2,#242424);border:1px solid var(--border-strong,#444);border-radius:3px;color:inherit;cursor:pointer;font:inherit;font-size:11px}
+.metro-controls button:hover,.metro-controls button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}

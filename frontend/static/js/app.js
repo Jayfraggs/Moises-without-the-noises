@@ -22,30 +22,36 @@ import { Catalog }    from './catalog.js';
 import { Studio }     from './studio.js';
 import { Transport }  from './transport.js';
 import { Import }     from './import.js';
-import { Extract }    from './extract.js';
 import { Settings }   from './settings.js';
 import { SolfaPanel } from './solfa.js';
 import { LyricsPanel } from './lyrics.js';
 import { BeatGrid }   from './beat-grid.js';
 import { Sections }   from './sections.js';
 import { VuMeters }   from './vu-meters.js';
+import { HarmonicPanel } from './harmonic.v2.js';
+import { initResizablePanels } from './resizablePanels.v3.js';
+import { initExtractPanel } from './ui/extractPanel.js';
 
 window._mwtn = { State, API };
 
 async function boot() {
+  try { State.solfa_colours = JSON.parse(localStorage.getItem('mwtn_extract_settings') || '{}').solfa_colours ?? true; } catch { State.solfa_colours = true; }
   console.log('[mwtn] booting…');
+  initResizablePanels();
 
   const studio     = new Studio({ State, API });
+  window._mwtn._studio = studio;
   const catalog    = new Catalog({ State, API, Studio });
   const transport  = new Transport({ State, studio });
   const importer   = new Import({ State, API, catalog });
-  const extract    = new Extract({ API });
   const settings   = new Settings({ State, API, catalog });
   const solfaPanel = new SolfaPanel({ API });
   const lyricsPanel = new LyricsPanel({ API });
   const beatGrid   = new BeatGrid({ State, API, studio });
   const sections   = new Sections({ State, API, studio });
   const vuMeters   = new VuMeters({ studio });
+  const harmonic   = new HarmonicPanel({ State, API });
+  harmonic.init();
 
   catalog.studio = studio;
 
@@ -56,6 +62,7 @@ async function boot() {
     lyricsPanel.tick(pos);
     beatGrid.tick(pos);
     sections.tick(pos);
+    harmonic.tick(pos);
   };
 
   studio._onStemReady = (name, total, loaded) => {
@@ -74,6 +81,8 @@ async function boot() {
 
     await _origLoad(songId);
 
+    harmonic.loadSong(songId);
+
     beatGrid.loadSong(songId);
     sections.loadSong(songId);
     lyricsPanel.loadSong(songId);
@@ -82,7 +91,7 @@ async function boot() {
     _updateExportPerStemPanel();
     _updateVocalSplitUI();
 
-    if (State.manifest?.stems?.includes('bass')) solfaPanel.loadSong(songId);
+    if (State.manifest?.stems?.includes('bass')) solfaPanel.loadSong(songId, 'bass');
   };
 
   function _updateVocalSplitUI() {
@@ -110,26 +119,23 @@ async function boot() {
   document.addEventListener('lyrics:seek', (e) => studio.seek(e.detail.time));
 
   // ── Solfa panel collapse ─────────────────────────────────────────────────
-  const solfaColBtn  = document.getElementById('solfaCollapseBtn');
-  const solfaBody    = document.getElementById('solfaBody');
-  solfaColBtn?.addEventListener('click', () => {
-    const expanded = solfaColBtn.getAttribute('aria-expanded') === 'true';
-    solfaColBtn.setAttribute('aria-expanded', !expanded);
-    if (solfaBody) solfaBody.style.display = expanded ? 'none' : '';
-    const chevron = solfaColBtn.querySelector('polyline');
-    if (chevron) chevron.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
-  });
+  const bindCollapse = (buttonId, bodyId, panelId) => {
+    const button = document.getElementById(buttonId);
+    const body = document.getElementById(bodyId);
+    const panel = document.getElementById(panelId);
+    button?.addEventListener('click', () => {
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', String(!expanded));
+      body?.toggleAttribute('hidden', expanded);
+      panel?.classList.toggle('is-collapsed', expanded);
+      const chevron = button.querySelector('polyline');
+      chevron?.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
+    });
+  };
+  bindCollapse('solfaCollapseBtn', 'solfaBody', 'solfaPanel');
 
   // ── Lyrics panel collapse ─────────────────────────────────────────────────
-  const lyricsColBtn = document.getElementById('lyricsCollapseBtn');
-  const lyricsBody   = document.getElementById('lyricsBody');
-  lyricsColBtn?.addEventListener('click', () => {
-    const expanded = lyricsColBtn.getAttribute('aria-expanded') === 'true';
-    lyricsColBtn.setAttribute('aria-expanded', !expanded);
-    if (lyricsBody) lyricsBody.style.display = expanded ? 'none' : '';
-    const chevron = lyricsColBtn.querySelector('polyline');
-    if (chevron) chevron.setAttribute('points', expanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
-  });
+  bindCollapse('lyricsCollapseBtn', 'lyricsBody', 'lyricsPanel');
 
   // ── VU meter panel toggle ─────────────────────────────────────────────────
   const vuToggle = document.getElementById('vuToggleBtn');
@@ -240,7 +246,7 @@ async function boot() {
   await catalog.load();
   transport.init();
   importer.init();
-  await extract.init();
+  initExtractPanel({ api: API, state: State });
   settings.init();
 
   console.log('[mwtn] ready');
@@ -306,3 +312,4 @@ boot().then(() => {}).catch(err => {
   const errEl = document.getElementById('error');
   if (errEl) { errEl.textContent = `Failed to start: ${err.message}`; errEl.classList.remove('hidden'); }
 });
+
