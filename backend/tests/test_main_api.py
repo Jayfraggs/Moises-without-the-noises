@@ -174,6 +174,38 @@ def test_get_beats_not_found(client):
     assert r.status_code == 404
 
 
+def test_export_click_track_generates_and_caches(client, data_dir):
+    song_dir = data_dir / "click_song"
+    song_dir.mkdir()
+    beats_path = song_dir / "beats.json"
+    beats_path.write_text(json.dumps({"beats": [
+        {"time_s": 0.0, "beat_number": 1},
+        {"time_s": 0.5, "beat_number": 2},
+    ]}), encoding="utf-8")
+
+    response = client.get("/api/songs/click_song/click-track")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav"
+    assert "click_song_click.wav" in response.headers["content-disposition"]
+    click_path = song_dir / "click_track.wav"
+    assert click_path.exists()
+    first_mtime = click_path.stat().st_mtime
+
+    response = client.get("/api/songs/click_song/click-track")
+
+    assert response.status_code == 200
+    assert click_path.stat().st_mtime == first_mtime
+
+
+def test_export_click_track_requires_beats(client, data_dir):
+    (data_dir / "without_beats").mkdir()
+
+    response = client.get("/api/songs/without_beats/click-track")
+
+    assert response.status_code == 404
+
+
 # ── PATCH /api/songs/{id}/beats ─────────────────────────────────────────────
 
 def test_patch_beats(client, data_dir):

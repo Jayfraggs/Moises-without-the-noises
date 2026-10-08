@@ -1,3 +1,5 @@
+DONE
+
 ### [PLAN-07] MIDI + MusicXML Export
 
 **Scope:** Takes the resolved `MusicalEvent` stream (with solfa from Plan 06, rhythm/quantization from Plan 04, key/chord from Plan 05) and derives two canonical export formats — **MIDI** and **MusicXML** — both generated from the `MusicalEvent` model, never from each other. Also covers the frontend export UI extension and Colab pipeline integration.

@@ -2,6 +2,45 @@
 
 ## Extract panel model selection
 
+## Click track generation
+
+- `backend/audio/click_track.py` provides `generate_click_track`, which reads
+  beat timestamps from `beats.json` and writes a mono 16-bit WAV using NumPy and
+  SciPy. Downbeats use 1000 Hz and other beats use 800 Hz, with two seconds of
+  trailing silence.
+- `GET /api/songs/{song_id}/click-track` generates that WAV on demand, caches it
+  beside `beats.json`, and returns it as `{song_id}_click.wav`.
+
+## Browser metronome
+
+- `frontend/js/metronome.js` schedules Web Audio clicks with a 100 ms lookahead
+  and 25 ms `setTimeout` rescheduling loop.
+- `frontend/js/ui/metronome.js` renders the pulse, BPM, toggle, and tap-tempo
+  controls; `frontend/css/metronome.css` provides the dark-console styling.
+
+## Click track download
+
+- `frontend/js/ui/extractPanel.js` and its served mirror expose click-track WAV
+  downloads alongside MIDI and MusicXML exports.
+- `frontend/js/api.js` and its served mirror provide `API.downloadClickTrack`.
+
+## Colab click-track artifact
+
+- `colab/mwtn_pipeline.generate_click_track_artifact` creates an idempotent
+  `click_track.wav` beside `beats.json`, normalizing legacy float beat lists for
+  the shared click generator and skipping failures without aborting the run.
+- `colab/mwtn_notebook.ipynb` invokes the helper after beat analysis with no new
+  pip installs; the WAV is included automatically in the assembled ZIP.
+
+## MIDI export
+
+- `backend/export/midi_exporter.py` writes a tempo track plus one track per supplied stem from canonical musical events.
+- It accepts the requested `onset_s`/`pitch_midi` event shape and the current schema's `start_time`/`midi_pitch` aliases.
+- `backend/export/musicxml_exporter.py` writes dependency-free MusicXML parts with key, meter, pitches, rests, and measure completion.
+- `backend.main` exposes `/export/midi` and `/export/musicxml`, with JSON note normalization, mtime-based caching, and threaded export.
+- The active vanilla frontend exposes score downloads through `frontend/js/api.js` and `frontend/js/ui/extractPanel.js`; `frontend/static/` mirrors these modules for serving.
+- `colab/mwtn_pipeline.generate_score_exports` and the notebook's score-export cell create `{song_id}.mid` and `{song_id}.xml` before ZIP assembly, with independent format failures.
+
 - `frontend/js/ui/extractPanel.js`: loads `API.getConfig()` and renders only model-supported output stems.
 - `docs/features/extract-panel-user-guide.md`: user-facing explanation of each Extract & Analyse tab.
 

@@ -63,12 +63,13 @@ import threading
 import uuid
 import zipfile
 from io import BytesIO
+from types import SimpleNamespace
 from pathlib import Path
 
 import yaml
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -81,6 +82,7 @@ from separation import run_separation, SUPPORTED_MODELS, DEFAULT_MODEL
 from audio.bpm import detect_beats
 from audio.key_detection import detect_key
 from audio.pitch import pitch_shift_wav, time_stretch_wav
+from audio.click_track import generate_click_track
 from audio.waveform_scan import scan_stem
 from audio.sections import normalize_sections, validate_sections
 from audio.vocal_split import run_vocal_split
@@ -572,6 +574,33 @@ async def export_stem(song_id: str, stem_name: str,
 
 
 # ── Analysis: beats ───────────────────────────────────────────────────────────
+
+@app.get("/api/songs/{song_id}/click-track")
+async def export_click_track(song_id: str) -> FileResponse:
+    """Generate or return the cached WAV click track for a song."""
+    song_id = validate_song_id(song_id)
+    song_dir = DATA_DIR / song_id
+    beats_path = song_dir / "beats.json"
+    output_path = song_dir / "click_track.wav"
+
+    if not beats_path.exists():
+        raise HTTPException(404, f"No beat analysis found for song {song_id!r}")
+
+    def _generate_if_stale() -> None:
+        if output_path.exists() and output_path.stat().st_mtime >= beats_path.stat().st_mtime:
+            return
+        generate_click_track(beats_path, output_path)
+
+    try:
+        await asyncio.to_thread(_generate_if_stale)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(500, f"Click track generation failed: {exc}") from exc
+
+    return FileResponse(
+        str(output_path),
+        media_type="audio/wav",
+        filename=f"{song_id}_click.wav",
+    )
 
 class BeatsPatch(BaseModel):
     beats: list
@@ -1285,6 +1314,83 @@ def get_stem_presence(song_id: str):
 
 
 # ── Mixdown export ────────────────────────────────────────────────────────────
+
+def _load_score_export_inputs(song_dir: Path) -> tuple[dict, float, str, str, tuple[int, int], list[Path]]:
+    note_paths = sorted(song_dir.glob("notes_*.json"))
+    if not note_paths:
+        raise HTTPException(404, f"No note analysis files for '{song_dir.name}'")
+
+    beats_path = song_dir / "beats.json"
+    key_path = song_dir / "key.json"
+    beats = json.loads(beats_path.read_text(encoding="utf-8")) if beats_path.exists() else {}
+    key = json.loads(key_path.read_text(encoding="utf-8")) if key_path.exists() else {}
+    tempo_bpm = float(beats.get("tempo_bpm", beats.get("bpm", 120.0)))
+    raw_signature = beats.get("time_signature", [4, 4])
+    time_signature = (int(raw_signature[0]), int(raw_signature[1]))
+    key_text = str(key.get("key", "C major"))
+    key_tonic = str(key.get("tonic", key.get("root", key_text.split()[0] if key_text.split() else "C")))
+    mode = str(key.get("mode", key_text.split()[1] if len(key_text.split()) > 1 else "major"))
+
+    stem_events = {}
+    for note_path in note_paths:
+        stem = note_path.stem.removeprefix("notes_")
+        raw_events = json.loads(note_path.read_text(encoding="utf-8"))
+        events = []
+        for raw in raw_events if isinstance(raw_events, list) else raw_events.get("events", []):
+            start = float(raw.get("onset_s", raw.get("start", raw.get("start_time", 0.0))))
+            end = raw.get("end", raw.get("end_time"))
+            duration = raw.get("duration_s")
+            if duration is None and end is not None:
+                duration = max(0.0, float(end) - start)
+            events.append(SimpleNamespace(
+                onset_s=start,
+                duration_s=float(duration or 0.0),
+                duration_beats=raw.get("duration_beats"),
+                pitch_midi=raw.get("pitch_midi", raw.get("midi", 0)),
+                velocity=raw.get("velocity"),
+            ))
+        stem_events[stem] = events
+    source_paths = [*note_paths]
+    source_paths.extend(path for path in (beats_path, key_path) if path.exists())
+    return stem_events, tempo_bpm, key_tonic, mode, time_signature, source_paths
+
+
+async def _export_score_file(song_id: str, file_type: str) -> FileResponse | JSONResponse:
+    song_dir = DATA_DIR / song_id
+    if not song_dir.exists():
+        raise HTTPException(404, f"No song '{song_id}'")
+    suffix = ".mid" if file_type == "midi" else ".xml"
+    output_path = song_dir / f"{song_id}{suffix}"
+    try:
+        _, _, _, _, _, source_paths = _load_score_export_inputs(song_dir)
+        newest_source = max(path.stat().st_mtime for path in source_paths)
+        if output_path.exists() and output_path.stat().st_mtime >= newest_source:
+            return FileResponse(str(output_path), media_type="audio/midi" if file_type == "midi" else "application/vnd.recordare.musicxml+xml", filename=output_path.name)
+
+        stem_events, tempo_bpm, key_tonic, mode, time_signature, _ = _load_score_export_inputs(song_dir)
+        if file_type == "midi":
+            from backend.export.midi_exporter import export_midi
+            await asyncio.to_thread(export_midi, stem_events, tempo_bpm, output_path)
+            media_type = "audio/midi"
+        else:
+            from backend.export.musicxml_exporter import export_musicxml
+            await asyncio.to_thread(export_musicxml, stem_events, tempo_bpm, key_tonic, mode, time_signature, output_path)
+            media_type = "application/vnd.recordare.musicxml+xml"
+        return FileResponse(str(output_path), media_type=media_type, filename=output_path.name)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": f"{file_type}_export_failed", "detail": str(exc)})
+
+
+@app.get("/api/songs/{song_id}/export/midi", response_model=None)
+async def export_song_midi(song_id: str) -> FileResponse | JSONResponse:
+    return await _export_score_file(validate_song_id(song_id), "midi")
+
+
+@app.get("/api/songs/{song_id}/export/musicxml", response_model=None)
+async def export_song_musicxml(song_id: str) -> FileResponse | JSONResponse:
+    return await _export_score_file(validate_song_id(song_id), "musicxml")
 
 @app.get("/api/songs/{song_id}/mixdown.{ext}")
 def get_mixdown(song_id: str, ext: str,

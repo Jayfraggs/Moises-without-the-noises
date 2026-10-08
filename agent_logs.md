@@ -1,5 +1,33 @@
 # Agent Logs
 
+## 2026-10-08
+### Fix fresh-Colab repository discovery
+- Updated `colab/mwtn_notebook.ipynb` Cell 7 to clone the public mwtn repository into `/content/mwtn` when the backend source tree is not already present.
+- Preserved reuse of an existing upload/clone and added a clear setup failure message if the clone cannot complete.
+- The one-time source checkout is separate from model downloads; no additional pip installs were introduced.
+
+## 2026-10-08
+### Make Colab config copy control visible
+- Moved the selected-Colab-config copy button to the Extract panel footer so it remains visible regardless of the active tab or scroll position.
+- Renamed it to `Copy Selected Colab Config` and synchronized the served frontend mirror.
+
+## 2026-10-08
+### Restore served Run Panel module
+- Diagnosed the frontend/backend connection symptom as a static asset 404, not a backend API outage.
+- Copied `frontend/js/ui/runPanel.js` into `frontend/static/js/ui/runPanel.js`, matching the repository's source/served frontend mirror convention.
+- This restores the module imported by the Extract panel.
+
+## 2026-10-08
+### Restore Extract panel Colab config copy button
+- Restored the missing `Copy Colab Notebook Config` control in the active vanilla Extract panel.
+- Added clipboard copy with a textarea fallback and status feedback.
+- Synchronized the source and served frontend mirrors.
+
+## 2026-10-08
+### Fix FastAPI score export startup failure
+- Diagnosed `uvicorn` startup failure caused by FastAPI attempting to build a Pydantic response model from `FileResponse | JSONResponse` annotations on the MIDI and MusicXML export routes.
+- Added `response_model=None` to both route decorators, preserving mixed file/JSON response behavior while disabling invalid response-model inference.
+
 ## 2026-09-24
 ### Fix torch Version Pin for Python 3.14 (TASK-002)
 - Replaced `torch==2.4.1` with `torch==2.9.1+cpu` in `backend/requirements.txt` to ensure compatibility with Python 3.14 on CPU.
@@ -485,3 +513,102 @@ the same Settings panel to import the new song.
 - 2026-10-06 — Added `backend/jobs/notebook_generator.py` with `NotebookSettings`, strict parameters-cell lookup, JSON-safe string rendering, and immutable template generation for Colab exports.
 - 2026-10-06 — Added notebook download and parameter-text API routes to `backend/main.py`; routes create queued notebook jobs, generate in worker threads, slug filenames, and return structured generation failures.
 - 2026-10-06 — Added frontend Run Panel notebook flow, API client helpers, extract-panel wiring, polling tracker, clipboard fallback, and styling for Colab/local execution paths.
+# 2026-10-08 — MIDI exporter
+
+# 2026-10-08 — MusicXML exporter
+
+# 2026-10-08 — Score export API routes
+
+# 2026-10-08 — Frontend score export controls
+
+# 2026-10-08 — Colab score export pipeline
+
+## Added
+
+- Added `generate_score_exports` to `colab/mwtn_pipeline.py` for idempotent MIDI and MusicXML generation from note artifacts.
+- Added a post-solfa notebook cell that installs `mido` only when absent and runs each export independently before ZIP assembly.
+- Added per-format success/failure logging with output sizes and documented the approximately 50 KB Colab install cost.
+
+## Verification
+
+- Confirmed notebook JSON parses and the new cells occur between solfa generation and ZIP assembly.
+- Python syntax validation passed for `colab/mwtn_pipeline.py`.
+
+## Added
+
+- Added typed blob download helpers for MIDI and MusicXML to both active API module copies.
+- Replaced planned score-export status behavior with local download actions, per-button loading state, inline errors, and notes-readiness tooltips.
+- Synchronized `frontend/js/` changes to the served `frontend/static/js/` tree.
+
+## Compatibility
+
+- The requested React paths do not exist in this migrated repository; implementation uses the active vanilla frontend architecture.
+
+## Added
+
+- Added threaded MIDI and MusicXML download routes to `backend/main.py`.
+- Added legacy note JSON normalization, source-mtime cache checks, and structured export failures.
+
+## Verification
+
+- Validated `backend/main.py` syntax with the project virtual environment.
+
+## Added
+
+- Added `backend/export/musicxml_exporter.py` using only `xml.etree.ElementTree`.
+- Implemented multi-part score output, pitch conversion, standard durations, rests, key signatures, and incomplete-measure filling.
+
+## Verification
+
+- Validated exporter syntax with the project virtual environment.
+
+## Added
+
+- Added `backend/export/midi_exporter.py` with typed multi-track MIDI export, stem channels, timing conversion, rest filtering, and velocity defaults.
+- Added `backend/export/__init__.py` export surface.
+
+## Dependencies
+
+- Added `mido>=1.3.0` to `backend/requirements.txt`.
+
+## Documentation
+
+- Updated `codebase_reference.md` with the MIDI export module and event-field compatibility note.
+## 2026-10-08 — P08-BE-01 click track generator
+
+- Added `backend/audio/click_track.py` with validated beats JSON parsing and
+  stateless NumPy/SciPy WAV synthesis.
+- Added `backend/tests/test_click_track.py` covering mono 16-bit output,
+  timestamps, duration, and return path.
+- Updated `codebase_reference.md` with the new audio utility.
+- Verified the focused pytest after adjusting its sample rate to avoid a
+  Nyquist-aliasing artifact in the test fixture.
+## 2026-10-08 — P08-BE-02 click track export route
+
+- Added `GET /api/songs/{song_id}/click-track` to `backend/main.py`.
+- Added stale-cache handling, background-thread generation, WAV download headers,
+  and 404/500 error handling.
+- Added API tests for generation, cache reuse, and missing beat analysis.
+- `py_compile` passed; API execution is currently blocked at import by the
+  pre-existing `FileResponse | JSONResponse` annotation in the MIDI export
+  route under the installed FastAPI version.
+## 2026-10-08 — P08-FE-01/02 browser metronome
+
+- Added the Web Audio lookahead scheduler in `frontend/js/metronome.js`.
+- Added the metronome UI and tap-tempo behavior in `frontend/js/ui/metronome.js`.
+- Added `frontend/css/metronome.css` and the `#metronome-mount` HTML slot.
+- Updated `codebase_reference.md`.
+## 2026-10-08 — P08-FE-03 click track download
+
+- Added `API.downloadClickTrack(songId)` to both frontend API module copies.
+- Added click-track export handling, download naming, loading/error behavior,
+  and the beats-not-detected tooltip to both extract panel copies.
+- Preserved the repository's source/served frontend mirror convention.
+## 2026-10-08 — P08-COLAB-01 click track pipeline
+
+- Added `generate_click_track_artifact` to `colab/mwtn_pipeline.py`.
+- Added the guarded, zero-install click-track cell to
+  `colab/mwtn_notebook.ipynb` before ZIP assembly.
+- Added stale-output reuse, output-size logging, failure isolation, and legacy
+  float-beat normalization.
+- Verified notebook JSON and pipeline Python syntax.

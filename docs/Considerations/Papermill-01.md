@@ -1,3 +1,4 @@
+Do this second to last
 ### [PAPERMILL-01] Colab Automation via Papermill
 
 **Context:** The "Colab CLI" as a concept doesn't map cleanly to automating a *hosted* Colab runtime — Google's Colab API doesn't expose a "run notebook" endpoint for free tier users. What does work: **Papermill**, which executes `.ipynb` notebooks as scripts, either locally or against a Jupyter kernel. For MWTN's architecture, the practical automation path is: Papermill runs the notebook *locally* (CPU path for lightweight pipeline steps) or triggers a pre-configured kernel on a remote Jupyter server (if the user self-hosts one). For Colab specifically, the closest automation is using the **Google Colab REST API** (v1, available to Workspace users) or, more practically, **keeping the job runner cell open and letting it poll** — which is already how Plan 12 works.
